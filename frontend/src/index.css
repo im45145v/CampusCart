@@ -1,0 +1,31 @@
+@import '@fontsource-variable/manrope';
+@import '@fontsource-variable/inter';
+@import 'tailwindcss';
+
+@theme {
+  --color-ivory: #f7f4ed;
+  --color-card: #ffffff;
+  --color-terracotta: #c65d3a;
+  --color-terracotta-dark: #a94a2b;
+  --color-forest: #263d32;
+  --color-ink: #2b2b2b;
+  --color-taupe: #6f6559;
+  --color-line: #e6dfd1;
+  --color-ok: #2f6b45;
+  --color-warn: #8a5a00;
+  --color-bad: #a3302a;
+  --font-heading: 'Manrope Variable', 'DM Sans', system-ui, sans-serif;
+  --font-body: 'Inter Variable', system-ui, sans-serif;
+}
+
+@layer base {
+  body {
+    @apply bg-ivory font-body text-ink antialiased;
+  }
+  h1, h2, h3, h4 {
+    @apply font-heading text-forest;
+  }
+  :focus-visible {
+    @apply outline-2 outline-offset-2 outline-terracotta;
+  }
+}

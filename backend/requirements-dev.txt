@@ -1,0 +1,6 @@
+-r requirements.txt
+pytest>=8
+pytest-asyncio>=0.23
+mongomock-motor>=0.0.30
+ruff>=0.5
+mypy>=1.10
