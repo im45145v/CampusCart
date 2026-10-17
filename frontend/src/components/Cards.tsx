@@ -1,25 +1,32 @@
 import { Star } from 'lucide-react'
 import { Link } from 'react-router-dom'
 import { formatMoney } from '@/lib/utils'
+import { DEFAULT_THEME } from '@/lib/theme'
 import type { Product, Store } from '@/lib/types'
 import { Badge } from './ui/badge'
 import { Card } from './ui/card'
 
 export function StoreCard({ store }: { store: Store }) {
+  const t = { ...DEFAULT_THEME, ...store.theme }
   return (
     <Link to={`/stores/${store.id}`} className="block">
-      <Card className="h-full transition-shadow hover:shadow-md">
-        <div className="mb-3 flex h-28 items-center justify-center overflow-hidden rounded-xl bg-ivory font-heading text-3xl font-extrabold text-forest/40">
-          {store.logo_url ? <img src={store.logo_url} alt="" className="h-full w-full object-cover" /> : store.name.slice(0, 1)}
+      <Card className="h-full overflow-hidden p-0 transition-shadow hover:shadow-md">
+        <div className="relative h-28 w-full" style={{ background: `linear-gradient(135deg, ${t.accent}, ${t.primary})` }}>
+          {store.banner_url && <img src={store.banner_url} alt="" className="h-full w-full object-cover" />}
+          <div className="absolute -bottom-6 left-4 flex h-14 w-14 items-center justify-center overflow-hidden rounded-xl border-2 border-white bg-ivory font-heading text-xl font-extrabold text-forest/50 shadow">
+            {store.logo_url ? <img src={store.logo_url} alt="" className="h-full w-full object-cover" /> : store.name.slice(0, 1).toUpperCase()}
+          </div>
         </div>
-        <h3 className="font-bold">{store.name}</h3>
-        <p className="line-clamp-2 text-sm text-taupe">{store.description}</p>
-        <div className="mt-2 flex items-center gap-2 text-xs">
-          <Badge tone={store.is_open ? 'ok' : 'neutral'}>{store.is_open ? 'Open' : 'Closed'}</Badge>
-          <Badge>{store.category}</Badge>
-          {store.rating_count > 0 && (
-            <span className="flex items-center gap-1 text-taupe"><Star className="h-3 w-3 fill-current" aria-hidden /> {store.rating_avg.toFixed(1)} ({store.rating_count})</span>
-          )}
+        <div className="p-4 pt-8">
+          <h3 className="font-bold">{store.name}</h3>
+          <p className="line-clamp-2 text-sm text-taupe">{store.tagline || store.description}</p>
+          <div className="mt-2 flex items-center gap-2 text-xs">
+            <Badge tone={store.is_open ? 'ok' : 'neutral'}>{store.is_open ? 'Open' : 'Closed'}</Badge>
+            <Badge>{store.category}</Badge>
+            {store.rating_count > 0 && (
+              <span className="flex items-center gap-1 text-taupe"><Star className="h-3 w-3 fill-current" aria-hidden /> {store.rating_avg.toFixed(1)} ({store.rating_count})</span>
+            )}
+          </div>
         </div>
       </Card>
     </Link>

@@ -1,9 +1,26 @@
 export type Role = 'buyer' | 'seller' | 'admin'
 export interface User { id: string; name: string; email: string; roles: Role[]; karma_balance: number }
 export type StoreCategory = 'food' | 'printing' | 'handmade' | 'goods' | 'services'
+export interface StoreTheme {
+  primary: string; accent: string; background: string
+  font: 'modern' | 'serif' | 'rounded'; radius: 'sharp' | 'soft' | 'pill'
+}
+export interface CustomField { id: string; label: string; type: 'text' | 'select' | 'checkbox'; required: boolean; options: string[] }
+export interface OrderSettings {
+  fulfillment_options: ('pickup' | 'campus_meetup')[]; payment_options: ('pay_on_pickup' | 'manual_confirmation')[]
+  slots_enabled: boolean; slots: string[]; slot_required: boolean; slot_days_ahead: number; slot_capacity: number
+  utc_offset_min: number; max_qty_per_item: number; min_order_minor: number; lead_time_min: number
+  queue_min_per_order: number; order_instructions: string; custom_fields: CustomField[]
+}
+export interface OrderOptions extends OrderSettings {
+  days: { date: string; slots: { label: string; remaining: number | null; available: boolean }[] }[]
+  is_open: boolean; current_wait_min: number
+}
 export interface Store {
   id: string; owner_id: string; name: string; description: string; category: StoreCategory
-  logo_url: string | null; image_urls: string[]; operating_hours: string; pickup_details: string
+  logo_url: string | null; banner_url?: string | null; tagline?: string; announcement?: string
+  theme?: StoreTheme; order_settings?: OrderSettings
+  image_urls: string[]; operating_hours: string; pickup_details: string
   is_open: boolean; status: string; rating_avg: number; rating_count: number
 }
 export interface Variant { id: string; name: string; price_minor: number; stock: number | null }
@@ -28,6 +45,9 @@ export interface Order {
   store_name: string; items: OrderLine[]; total_minor: number; estimated_minor: number
   fulfillment: string; payment_method: string; payment_status: string; note: string
   request_details: string; status: OrderStatus; created_at: string
+  pickup_slot?: { date: string; label: string } | null
+  answers?: { id: string; label: string; value: string }[]
+  est_wait_min?: number
   history: { status: string; at: string; reason: string }[]
 }
 export interface Conversation {

@@ -14,6 +14,22 @@ import type { Order } from '@/lib/types'
 
 export const statusLabel = (s: string) => s.replace('_', ' ')
 
+export function slotText(slot: NonNullable<Order['pickup_slot']>): string {
+  const day = new Date(`${slot.date}T00:00:00`).toLocaleDateString(undefined, { weekday: 'short', day: 'numeric', month: 'short' })
+  return `${day}, ${slot.label.replace('-', ' to ')}`
+}
+
+export function OrderMeta({ order }: { order: Order }) {
+  const open = !['completed', 'rejected', 'cancelled'].includes(order.status)
+  return (
+    <div className="flex flex-wrap items-center gap-2 text-xs">
+      {order.pickup_slot && <Badge tone="ok">Pickup {slotText(order.pickup_slot)}</Badge>}
+      {open && !order.pickup_slot && !!order.est_wait_min && <Badge>About {order.est_wait_min} min wait</Badge>}
+      {order.answers?.map((a) => <span key={a.id} className="rounded-full bg-ivory px-2 py-0.5 text-forest">{a.label}: {a.value}</span>)}
+    </div>
+  )
+}
+
 export function OrderList() {
   const { data, loading, error, reload } = useFetch<Order[]>('/api/orders')
   if (loading) return <Loading />
@@ -25,7 +41,7 @@ export function OrderList() {
         <li key={o.id}>
           <Link to={`/orders/${o.id}`}>
             <Card className="flex items-center justify-between hover:shadow-md">
-              <div><p className="font-semibold">{o.store_name}</p><p className="text-sm text-taupe">{formatTime(o.created_at)} · {o.items.length} item(s)</p></div>
+              <div><p className="font-semibold">{o.store_name}</p><p className="text-sm text-taupe">{formatTime(o.created_at)} · {o.items.length} item(s)</p><OrderMeta order={o} /></div>
               <div className="text-right"><Badge tone={statusTone(o.status)}>{statusLabel(o.status)}</Badge><p className="mt-1 font-semibold">{o.total_minor ? formatMoney(o.total_minor) : 'Awaiting quote'}</p></div>
             </Card>
           </Link>
@@ -124,6 +140,9 @@ export function OrderDetail() {
         <p className="text-right text-lg font-bold">{data.total_minor ? formatMoney(data.total_minor) : `Awaiting quote (estimate ${formatMoney(data.estimated_minor)})`}</p>
         <p className="text-sm text-taupe">{data.fulfillment === 'pickup' ? 'Pickup' : 'Campus meetup'} · {data.payment_method === 'pay_on_pickup' ? 'Pay on pickup' : 'Paid directly to seller'} · Payment {data.payment_status === 'unpaid' ? 'not yet confirmed by seller' : 'confirmed by seller'}</p>
         {role === 'seller' && <p className="text-sm">Buyer: {data.buyer_name}</p>}
+        {data.pickup_slot && <p className="text-sm font-semibold text-forest">Pickup slot: {slotText(data.pickup_slot)}</p>}
+        {!!data.est_wait_min && !['completed', 'rejected', 'cancelled'].includes(data.status) && <p className="text-sm">Estimated wait when placed: about {data.est_wait_min} min</p>}
+        {data.answers?.map((a) => <p key={a.id} className="text-sm"><span className="text-taupe">{a.label}:</span> {a.value}</p>)}
         {data.note && <p className="text-sm">Note: {data.note}</p>}
         {data.request_details && <p className="whitespace-pre-line text-sm">Request: {data.request_details}</p>}
       </Card>

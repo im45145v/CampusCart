@@ -1,9 +1,11 @@
 from typing import Any
 
 from fastapi import APIRouter, HTTPException, Query
+from pydantic import ValidationError
 
 from ..deps import CurrentUser, DbDep, OptionalUser
-from ..schemas import StoreCategory, StoreIn, StorePatch
+from ..schemas import OrderSettings, StoreCategory, StoreIn, StorePatch
+from ..services.orders import order_options
 from ..util import contains_regex, new_id, now, out
 
 router = APIRouter(prefix="/api", tags=["stores"])
@@ -72,6 +74,14 @@ async def get_store(store_id: str, db: DbDep, user: OptionalUser = None) -> dict
     return out(s)
 
 
+@router.get("/stores/{store_id}/order-options")
+async def store_order_options(store_id: str, db: DbDep) -> dict[str, Any]:
+    s = await get_store_or_404(db, store_id)
+    if s["status"] != "active":
+        raise HTTPException(404, "Store not found")
+    return await order_options(db, s)
+
+
 @router.patch("/stores/{store_id}")
 async def update_store(
     store_id: str, body: StorePatch, user: CurrentUser, db: DbDep
@@ -79,7 +89,18 @@ async def update_store(
     s = await get_store_or_404(db, store_id)
     if s["owner_id"] != user["_id"]:
         raise HTTPException(403, "Not your store")
-    changes = body.model_dump(exclude_unset=True, exclude_none=True)
+    nullable = {"banner_url", "logo_url"}  # explicit null clears the image
+    changes = {
+        k: v for k, v in body.model_dump(exclude_unset=True).items() if v is not None or k in nullable
+    }
+    for key in ("theme", "order_settings"):  # partial nested patches keep the stored values
+        if key in changes:
+            changes[key] = {**(s.get(key) or {}), **changes[key]}
+            if key == "order_settings":
+                try:
+                    OrderSettings.model_validate(changes[key])
+                except ValidationError as e:
+                    raise HTTPException(422, e.errors()[0]["msg"]) from None
     if changes:
         await db.stores.update_one({"_id": store_id}, {"$set": changes})
     return out(await get_store_or_404(db, store_id))

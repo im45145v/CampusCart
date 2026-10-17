@@ -1,6 +1,7 @@
+import datetime as dt
 from typing import Annotated, Literal
 
-from pydantic import BaseModel, ConfigDict, Field, StringConstraints
+from pydantic import BaseModel, ConfigDict, Field, StringConstraints, model_validator
 
 Email = Annotated[
     str,
@@ -20,6 +21,80 @@ class Strict(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
 
+HexColor = Annotated[str, StringConstraints(pattern=r"^#[0-9a-fA-F]{6}$")]
+# Only our own uploads or https images: the value ends up in <img src>.
+ImageUrl = Annotated[str, StringConstraints(max_length=500, pattern=r"^(/uploads/[\w.\-]+|https://\S+)$")]
+SlotLabel = Annotated[
+    str, StringConstraints(pattern=r"^([01]\d|2[0-3]):[0-5]\d-([01]\d|2[0-3]):[0-5]\d$")
+]
+Fulfillment = Literal["pickup", "campus_meetup"]
+PaymentMethod = Literal["pay_on_pickup", "manual_confirmation"]
+
+
+class StoreTheme(Strict):
+    primary: HexColor = "#C65D3A"
+    accent: HexColor = "#263D32"
+    background: HexColor = "#F7F4ED"
+    font: Literal["modern", "serif", "rounded"] = "modern"
+    radius: Literal["sharp", "soft", "pill"] = "soft"
+
+
+class CustomField(Strict):
+    id: Annotated[str, StringConstraints(pattern=r"^[a-z0-9_]{1,30}$")]
+    label: Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=80)]
+    type: Literal["text", "select", "checkbox"] = "text"
+    required: bool = False
+    options: list[Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=60)]] = Field(
+        default_factory=list, max_length=12
+    )
+
+    @model_validator(mode="after")
+    def _select_needs_options(self) -> "CustomField":
+        if self.type == "select" and len(self.options) < 2:
+            raise ValueError("select fields need at least two options")
+        return self
+
+
+def _default_fulfillment() -> list[Fulfillment]:
+    return ["pickup", "campus_meetup"]
+
+
+def _default_payments() -> list[PaymentMethod]:
+    return ["pay_on_pickup", "manual_confirmation"]
+
+
+class OrderSettings(Strict):
+    """Per-store checkout rules. Every store can tune these; defaults match a plain store."""
+
+    fulfillment_options: list[Fulfillment] = Field(default_factory=_default_fulfillment, min_length=1)
+    payment_options: list[PaymentMethod] = Field(default_factory=_default_payments, min_length=1)
+    slots_enabled: bool = False
+    slots: list[SlotLabel] = Field(default_factory=list, max_length=24)
+    slot_required: bool = True
+    slot_days_ahead: int = Field(default=1, ge=0, le=7)
+    slot_capacity: int = Field(default=0, ge=0, le=200)  # orders per slot, 0 = unlimited
+    utc_offset_min: int = Field(default=330, ge=-720, le=840)  # store-local time, default IST
+    max_qty_per_item: int = Field(default=99, ge=1, le=99)
+    min_order_minor: int = Field(default=0, ge=0, le=100_000_00)
+    lead_time_min: int = Field(default=0, ge=0, le=1440)
+    queue_min_per_order: int = Field(default=0, ge=0, le=120)
+    order_instructions: str = Field(default="", max_length=300)
+    custom_fields: list[CustomField] = Field(default_factory=list, max_length=8)
+
+    @model_validator(mode="after")
+    def _consistent(self) -> "OrderSettings":
+        if len(set(self.slots)) != len(self.slots):
+            raise ValueError("duplicate time slots")
+        for s in self.slots:
+            if s[:5] >= s[6:]:
+                raise ValueError(f"slot {s} must end after it starts")
+        if self.slots_enabled and not self.slots:
+            raise ValueError("add at least one time slot or turn slots off")
+        if len({f.id for f in self.custom_fields}) != len(self.custom_fields):
+            raise ValueError("duplicate custom field ids")
+        return self
+
+
 class RegisterIn(Strict):
     name: Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=80)]
     email: Email
@@ -36,6 +111,11 @@ class StoreIn(Strict):
     description: str = Field(default="", max_length=2000)
     category: StoreCategory
     logo_url: str | None = Field(default=None, max_length=500)
+    banner_url: ImageUrl | None = None
+    tagline: str = Field(default="", max_length=120)
+    announcement: str = Field(default="", max_length=300)
+    theme: StoreTheme = Field(default_factory=StoreTheme)
+    order_settings: OrderSettings = Field(default_factory=OrderSettings)
     image_urls: list[str] = Field(default_factory=list, max_length=8)
     operating_hours: str = Field(default="", max_length=300)
     pickup_details: str = Field(default="", max_length=500)
@@ -47,6 +127,11 @@ class StorePatch(Strict):
     description: str | None = Field(default=None, max_length=2000)
     category: StoreCategory | None = None
     logo_url: str | None = Field(default=None, max_length=500)
+    banner_url: ImageUrl | None = None
+    tagline: str | None = Field(default=None, max_length=120)
+    announcement: str | None = Field(default=None, max_length=300)
+    theme: StoreTheme | None = None
+    order_settings: OrderSettings | None = None
     image_urls: list[str] | None = Field(default=None, max_length=8)
     operating_hours: str | None = Field(default=None, max_length=300)
     pickup_details: str | None = Field(default=None, max_length=500)
@@ -98,11 +183,20 @@ class OrderItemIn(Strict):
     quantity: int = Field(ge=1, le=99)
 
 
+class PickupSlotIn(Strict):
+    date: dt.date
+    label: SlotLabel
+
+
 class OrderIn(Strict):
     store_id: str
     items: list[OrderItemIn] = Field(min_length=1, max_length=50)
-    fulfillment: Literal["pickup", "campus_meetup"] = "pickup"
-    payment_method: Literal["pay_on_pickup", "manual_confirmation"] = "pay_on_pickup"
+    fulfillment: Fulfillment = "pickup"
+    payment_method: PaymentMethod = "pay_on_pickup"
+    pickup_slot: PickupSlotIn | None = None
+    answers: dict[
+        Annotated[str, StringConstraints(max_length=30)], Annotated[str, StringConstraints(max_length=300)]
+    ] = Field(default_factory=dict, max_length=8)
     note: str = Field(default="", max_length=1000)
     request_details: str = Field(default="", max_length=3000)  # printing / service requests
     file_urls: list[str] = Field(default_factory=list, max_length=5)

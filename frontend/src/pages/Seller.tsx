@@ -2,16 +2,19 @@ import { Mic, Sparkles, Square } from 'lucide-react'
 import { useRef, useState, type FormEvent } from 'react'
 import { Link } from 'react-router-dom'
 import { Empty, ErrorState, Loading, Notice } from '@/components/States'
+import { ImageUpload, OrderSettingsEditor, ThemeEditor } from '@/components/StoreEditors'
+import { StoreBanner } from '@/components/StoreBanner'
 import { Badge, statusTone } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
 import { Field, Input, Select, Textarea } from '@/components/ui/input'
 import { api } from '@/lib/api'
 import { useAuth } from '@/lib/auth'
+import { DEFAULT_ORDER_SETTINGS, DEFAULT_THEME, themeStyle } from '@/lib/theme'
 import { cn, formatMoney, formatTime, rupeesToMinor } from '@/lib/utils'
 import { useFetch } from '@/lib/useFetch'
 import type { Draft, Order, Product, Review, Store, Summary } from '@/lib/types'
-import { OrderActions, statusLabel } from './Orders'
+import { OrderActions, OrderMeta, statusLabel } from './Orders'
 
 const TABS = ['Overview', 'Listings', 'Orders', 'Store', 'Reviews'] as const
 type Tab = (typeof TABS)[number]
@@ -20,47 +23,57 @@ function StoreForm({ store, onSaved }: { store?: Store; onSaved: () => void }) {
   const { refresh } = useAuth()
   const [f, setF] = useState({
     name: store?.name ?? '', description: store?.description ?? '', category: store?.category ?? 'food',
+    tagline: store?.tagline ?? '', announcement: store?.announcement ?? '',
     operating_hours: store?.operating_hours ?? '', pickup_details: store?.pickup_details ?? '',
-    logo_url: store?.logo_url ?? '', is_open: store?.is_open ?? true,
+    logo_url: store?.logo_url ?? null, banner_url: store?.banner_url ?? null, is_open: store?.is_open ?? true,
+    theme: { ...DEFAULT_THEME, ...store?.theme },
+    order_settings: { ...DEFAULT_ORDER_SETTINGS, ...store?.order_settings },
   })
   const [msg, setMsg] = useState<{ tone: 'ok' | 'bad'; text: string } | null>(null)
-  const logo = useRef<HTMLInputElement>(null)
-  const upload = async () => {
-    const file = logo.current?.files?.[0]
-    if (!file) return
-    const form = new FormData()
-    form.append('file', file)
-    try {
-      const r = await api<{ url: string }>('/api/uploads', { method: 'POST', form })
-      setF((p) => ({ ...p, logo_url: r.url }))
-    } catch (e) {
-      setMsg({ tone: 'bad', text: e instanceof Error ? e.message : 'Upload failed' })
-    }
-  }
   const save = async (e: FormEvent) => {
     e.preventDefault()
     try {
-      const body = { ...f, logo_url: f.logo_url || null }
-      await api(store ? `/api/stores/${store.id}` : '/api/stores', { method: store ? 'PATCH' : 'POST', body })
+      await api(store ? `/api/stores/${store.id}` : '/api/stores', { method: store ? 'PATCH' : 'POST', body: f })
       await refresh()
-      setMsg({ tone: 'ok', text: 'Saved.' })
+      setMsg({ tone: 'ok', text: 'Saved. Your store page is updated.' })
       onSaved()
     } catch (err) {
       setMsg({ tone: 'bad', text: err instanceof Error ? err.message : 'Save failed' })
     }
   }
+  const section = 'space-y-3 rounded-2xl border border-line bg-card p-5'
   return (
-    <form onSubmit={save} className="space-y-3">
-      <Field label="Store name"><Input required minLength={2} value={f.name} onChange={(e) => setF({ ...f, name: e.target.value })} /></Field>
-      <Field label="Description"><Textarea value={f.description} onChange={(e) => setF({ ...f, description: e.target.value })} /></Field>
-      <div className="grid gap-3 sm:grid-cols-2">
-        <Field label="Category"><Select value={f.category} onChange={(e) => setF({ ...f, category: e.target.value as Store['category'] })}>{['food', 'printing', 'handmade', 'goods', 'services'].map((c) => <option key={c}>{c}</option>)}</Select></Field>
-        <Field label="Operating hours"><Input value={f.operating_hours} onChange={(e) => setF({ ...f, operating_hours: e.target.value })} placeholder="Mon–Fri 10:00–18:00" /></Field>
+    <form onSubmit={save} className="space-y-5">
+      <section className={section}>
+        <h3 className="text-lg font-bold">Basics</h3>
+        <Field label="Store name"><Input required minLength={2} value={f.name} onChange={(e) => setF({ ...f, name: e.target.value })} /></Field>
+        <Field label="Tagline" hint="One line under your name."><Input maxLength={120} value={f.tagline} onChange={(e) => setF({ ...f, tagline: e.target.value })} placeholder="Wok-fresh fried rice, every lunch" /></Field>
+        <Field label="Description"><Textarea value={f.description} onChange={(e) => setF({ ...f, description: e.target.value })} /></Field>
+        <Field label="Announcement banner" hint="Shown at the top of your store page: offers, closures, news."><Input maxLength={300} value={f.announcement} onChange={(e) => setF({ ...f, announcement: e.target.value })} placeholder="Exam week special: free cutlery and a cold drink with every combo" /></Field>
+        <div className="grid gap-3 sm:grid-cols-2">
+          <Field label="Category"><Select value={f.category} onChange={(e) => setF({ ...f, category: e.target.value as Store['category'] })}>{['food', 'printing', 'handmade', 'goods', 'services'].map((c) => <option key={c}>{c}</option>)}</Select></Field>
+          <Field label="Operating hours"><Input value={f.operating_hours} onChange={(e) => setF({ ...f, operating_hours: e.target.value })} placeholder="Mon–Fri 10:00–18:00" /></Field>
+        </div>
+        <Field label="Pickup details"><Input value={f.pickup_details} onChange={(e) => setF({ ...f, pickup_details: e.target.value })} placeholder="Hostel B gate, 5–7 pm" /></Field>
+        <label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={f.is_open} onChange={(e) => setF({ ...f, is_open: e.target.checked })} /> Open for orders</label>
+      </section>
+      <section className={section}>
+        <h3 className="text-lg font-bold">Look and feel</h3>
+        <div className="grid gap-4 sm:grid-cols-[auto_1fr]">
+          <ImageUpload label="Logo" value={f.logo_url} onChange={(u) => setF({ ...f, logo_url: u })} previewClass="h-24 w-24" />
+          <ImageUpload label="Cover banner (wide photo works best)" value={f.banner_url} onChange={(u) => setF({ ...f, banner_url: u })} previewClass="h-24 w-64" />
+        </div>
+        <ThemeEditor value={f.theme} onChange={(t) => setF({ ...f, theme: t })} store={{ name: f.name, logo_url: f.logo_url, banner_url: f.banner_url, tagline: f.tagline }} />
+      </section>
+      <section className={section}>
+        <h3 className="text-lg font-bold">Ordering rules</h3>
+        <p className="text-sm text-taupe">Everything buyers see at checkout comes from here.</p>
+        <OrderSettingsEditor value={f.order_settings} onChange={(s) => setF({ ...f, order_settings: s })} />
+      </section>
+      <div className="flex flex-wrap items-center gap-3">
+        <Button type="submit" size="lg">{store ? 'Save changes' : 'Create store'}</Button>
+        {store && <Link className="text-sm text-terracotta underline" to={`/stores/${store.id}`}>View store page</Link>}
       </div>
-      <Field label="Pickup details"><Input value={f.pickup_details} onChange={(e) => setF({ ...f, pickup_details: e.target.value })} placeholder="Hostel B gate, 5–7 pm" /></Field>
-      <Field label="Logo (PNG, JPEG or WebP, up to 2 MB)"><input ref={logo} type="file" accept="image/png,image/jpeg,image/webp" onChange={upload} /></Field>
-      <label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={f.is_open} onChange={(e) => setF({ ...f, is_open: e.target.checked })} /> Open for orders</label>
-      <Button type="submit">{store ? 'Save changes' : 'Create store'}</Button>
       {msg && <Notice tone={msg.tone}>{msg.text}</Notice>}
     </form>
   )
@@ -112,6 +125,7 @@ function Dictation({ onText }: { onText: (t: string) => void }) {
 function ListingForm({ store, onSaved }: { store: Store; onSaved: () => void }) {
   const empty = { title: '', description: '', kind: 'product', listing_type: 'new', category: 'general', price: '', stock: '', prep: '' }
   const [f, setF] = useState(empty)
+  const [image, setImage] = useState<string | null>(null)
   const [aiText, setAiText] = useState('')
   const [ai, setAi] = useState<{ warnings: string[]; missing: string[] } | null>(null)
   const [msg, setMsg] = useState<{ tone: 'ok' | 'bad'; text: string } | null>(null)
@@ -143,10 +157,12 @@ function ListingForm({ store, onSaved }: { store: Store; onSaved: () => void }) 
         body: {
           title: f.title, description: f.description, kind: f.kind, listing_type: f.listing_type, category: f.category || 'general',
           price_minor: rupeesToMinor(f.price), stock: f.stock === '' ? null : Number(f.stock), prep_time_min: Number(f.prep || 0),
+          image_urls: image ? [image] : [],
         },
       })
       setMsg({ tone: 'ok', text: 'Saved as a draft. Publish it from the list when you are ready.' })
       setF(empty)
+      setImage(null)
       setAi(null)
       onSaved()
     } catch (err) {
@@ -183,6 +199,7 @@ function ListingForm({ store, onSaved }: { store: Store; onSaved: () => void }) 
           <Field label="Stock" hint="Leave empty for unlimited"><Input type="number" min={0} value={f.stock} onChange={(e) => setF({ ...f, stock: e.target.value })} /></Field>
           <Field label="Prep time (min)"><Input type="number" min={0} value={f.prep} onChange={(e) => setF({ ...f, prep: e.target.value })} /></Field>
         </div>
+        <ImageUpload label="Photo" value={image} onChange={setImage} previewClass="h-24 w-24" />
         <Button type="submit">Save draft</Button>
       </form>
       {msg && <Notice tone={msg.tone}>{msg.text}</Notice>}
@@ -197,6 +214,16 @@ function Listings({ store }: { store: Store }) {
     setErr('')
     try { await api(path, { method, body }); await reload() } catch (e) { setErr(e instanceof Error ? e.message : 'Failed') }
   }
+  const uploadPhoto = async (id: string, file?: File) => {
+    if (!file) return
+    const form = new FormData()
+    form.append('file', file)
+    setErr('')
+    try {
+      const r = await api<{ url: string }>('/api/uploads', { method: 'POST', form })
+      await call(`/api/products/${id}`, 'PATCH', { image_urls: [r.url] })
+    } catch (e) { setErr(e instanceof Error ? e.message : 'Upload failed') }
+  }
   return (
     <div className="space-y-6">
       <ListingForm store={store} onSaved={reload} />
@@ -205,11 +232,18 @@ function Listings({ store }: { store: Store }) {
           {data.map((p) => (
             <li key={p.id}>
               <Card className="flex flex-wrap items-center justify-between gap-3">
-                <div>
+                <div className="flex items-center gap-3">
+                  <div className="h-14 w-14 shrink-0 overflow-hidden rounded-lg bg-ivory">{p.image_urls[0] && <img src={p.image_urls[0]} alt="" className="h-full w-full object-cover" />}</div>
+                  <div>
                   <p className="font-semibold">{p.title} <Badge tone={p.published ? 'ok' : 'neutral'}>{p.published ? 'Published' : 'Draft'}</Badge> {p.moderation_status === 'removed' && <Badge tone="bad">Removed by moderators</Badge>}</p>
                   <p className="text-sm text-taupe">{formatMoney(p.price_from_minor)} · {p.stock === null && !p.variants.length ? 'unlimited stock' : `stock ${p.variants.length ? p.variants.map((v) => `${v.name}: ${v.stock ?? '∞'}`).join(', ') : p.stock}`}</p>
+                  </div>
                 </div>
-                <div className="flex items-end gap-2">
+                <div className="flex flex-wrap items-end gap-2">
+                  <label className="cursor-pointer rounded-lg border border-line bg-card px-3 py-1.5 text-xs font-semibold text-forest hover:bg-ivory">
+                    {p.image_urls[0] ? 'Change photo' : 'Add photo'}
+                    <input type="file" className="sr-only" accept="image/png,image/jpeg,image/webp" onChange={(e) => void uploadPhoto(p.id, e.target.files?.[0])} />
+                  </label>
                   {p.variants.length === 0 && p.stock !== null && (
                     <label className="text-xs">Stock<Input type="number" min={0} className="ml-1 inline-block w-20" defaultValue={p.stock} onBlur={(e) => void call(`/api/products/${p.id}`, 'PATCH', { stock: Number(e.target.value) })} /></label>
                   )}
@@ -268,6 +302,7 @@ function SellerOrders() {
               <Badge tone={statusTone(o.status)}>{statusLabel(o.status)}</Badge>
             </div>
             <p className="text-sm">{o.items.map((l) => `${l.quantity}× ${l.title}${l.variant_name ? ` (${l.variant_name})` : ''}`).join(', ')} · {o.total_minor ? formatMoney(o.total_minor) : 'needs quote'}</p>
+            <OrderMeta order={o} />
             <OrderActions order={o} role="seller" onChange={(n) => setData((data ?? []).map((x) => (x.id === n.id ? n : x)))} />
           </Card>
         </li>
@@ -294,9 +329,16 @@ export default function Seller() {
     </div>
   )
   return (
-    <div className="space-y-6">
+    <div className="space-y-6" style={themeStyle(store.theme)}>
+      <StoreBanner store={store} height="h-32 sm:h-44">
+        <div className="flex flex-wrap items-center gap-2 pt-3">
+          <Badge tone={store.is_open ? 'ok' : 'neutral'}>{store.is_open ? 'Open for orders' : 'Closed'}</Badge>
+          <Button asChild variant="secondary" size="sm"><Link to={`/stores/${store.id}`}>View store page</Link></Button>
+          <Button size="sm" onClick={() => setTab('Store')}>Edit look and rules</Button>
+        </div>
+      </StoreBanner>
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <h1 className="text-2xl font-extrabold">Seller Studio: {store.name}</h1>
+        <h2 className="text-xl font-extrabold">Seller Studio</h2>
         {stores.data && stores.data.length > 1 && <Select aria-label="Choose store" className="w-48" value={idx} onChange={(e) => setIdx(Number(e.target.value))}>{stores.data.map((s, i) => <option key={s.id} value={i}>{s.name}</option>)}</Select>}
       </div>
       <div role="tablist" className="flex flex-wrap gap-1 border-b border-line">
@@ -306,7 +348,7 @@ export default function Seller() {
       {tab === 'Overview' && <Overview />}
       {tab === 'Listings' && <Listings store={store} />}
       {tab === 'Orders' && <SellerOrders />}
-      {tab === 'Store' && <Card><StoreForm store={store} onSaved={() => void stores.reload()} /></Card>}
+      {tab === 'Store' && <StoreForm key={store.id} store={store} onSaved={() => void stores.reload()} />}
       {tab === 'Reviews' && (reviews.loading ? <Loading /> : reviews.data?.length ? <ul className="space-y-2">{reviews.data.map((r) => <li key={r.id}><Card>{'★'.repeat(r.rating)} <span className="sr-only">{r.rating} out of 5</span> {r.comment} <span className="text-sm text-taupe">by {r.buyer_name}</span></Card></li>)}</ul> : <Empty title="No reviews yet" />)}
     </div>
   )

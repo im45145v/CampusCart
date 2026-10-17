@@ -7,6 +7,7 @@ import { Button } from '@/components/ui/button'
 import { Field, Input, Select } from '@/components/ui/input'
 import { useAuth } from '@/lib/auth'
 import { useCart } from '@/lib/cartContext'
+import { themeStyle } from '@/lib/theme'
 import { formatMoney } from '@/lib/utils'
 import { useFetch } from '@/lib/useFetch'
 import type { Product, Store } from '@/lib/types'
@@ -24,17 +25,18 @@ export default function ProductPage() {
   if (product.loading) return <Loading />
   if (product.error || !product.data) return <ErrorState message={product.error ?? 'Not found'} />
   const p = product.data
+  const maxQty = store.data?.order_settings?.max_qty_per_item ?? 99
   const variant = p.variants.find((v) => v.id === (variantId || p.variants[0]?.id))
   const price = variant ? variant.price_minor : p.price_minor
   const add = () => {
     cart.add({
       storeId: p.store_id, storeName: store.data?.name ?? '', productId: p.id, variantId: variant?.id ?? null,
-      title: p.title, variantName: variant?.name ?? null, unitPriceMinor: price, quantity: qty,
+      title: p.title, variantName: variant?.name ?? null, unitPriceMinor: price, quantity: Math.min(qty, maxQty),
     })
     setAdded(true)
   }
   return (
-    <div className="grid gap-8 md:grid-cols-2">
+    <div className="grid gap-8 rounded-3xl bg-ivory p-3 sm:p-5 md:grid-cols-2" style={themeStyle(store.data?.theme)}>
       <div className="flex h-72 items-center justify-center overflow-hidden rounded-2xl border border-line bg-card text-taupe">
         {p.image_urls[0] ? <img src={p.image_urls[0]} alt={p.title} className="h-full w-full object-cover" /> : 'No photo'}
       </div>
@@ -59,7 +61,7 @@ export default function ProductPage() {
           </Field>
         )}
         <div className="flex items-end gap-3">
-          <Field label="Quantity"><Input type="number" min={1} max={99} value={qty} onChange={(e) => setQty(Math.max(1, Math.min(99, Number(e.target.value) || 1)))} className="w-24" /></Field>
+          <Field label="Quantity"><Input type="number" min={1} max={maxQty} value={Math.min(qty, maxQty)} onChange={(e) => setQty(Math.max(1, Math.min(maxQty, Number(e.target.value) || 1)))} className="w-24" /></Field>
           <Button size="lg" disabled={!p.in_stock || user?.id === store.data?.owner_id} onClick={add}>Add to cart</Button>
         </div>
         {added && <Notice tone="ok">Added to cart. <Link className="underline" to="/cart">View cart</Link></Notice>}
