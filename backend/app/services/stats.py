@@ -9,12 +9,10 @@ PREP_PRIORITY = {"preparing": 0, "accepted": 1, "placed": 2, "quote_requested": 
 
 
 async def pending_orders(db: Database, seller_id: str, limit: int = 20) -> list[dict[str, Any]]:
-    cur = db.orders.find({"seller_id": seller_id, "status": {"$in": ACTIVE_STATUSES}}).sort(
-        "created_at", 1
-    ).limit(limit)
+    cur = db.orders.find({"seller_id": seller_id, "status": {"$in": ACTIVE_STATUSES}})
     orders = [out(o) async for o in cur]
     orders.sort(key=lambda o: (PREP_PRIORITY.get(o["status"], 9), o["created_at"]))
-    return orders
+    return orders[:limit]
 
 
 async def low_stock(db: Database, seller_id: str, threshold: int = 5) -> list[dict[str, Any]]:

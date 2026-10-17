@@ -1,3 +1,4 @@
+import base64
 import hashlib
 import secrets
 from datetime import timedelta
@@ -12,13 +13,18 @@ from .util import now
 ALGORITHM = "HS256"
 
 
+def _prehash(password: str) -> bytes:
+    # bcrypt ignores bytes beyond 72; pre-hash so the whole password is significant
+    return base64.b64encode(hashlib.sha256(password.encode()).digest())
+
+
 def hash_password(password: str) -> str:
-    return bcrypt.hashpw(password.encode()[:72], bcrypt.gensalt()).decode()
+    return bcrypt.hashpw(_prehash(password), bcrypt.gensalt()).decode()
 
 
 def verify_password(password: str, hashed: str) -> bool:
     try:
-        return bcrypt.checkpw(password.encode()[:72], hashed.encode())
+        return bcrypt.checkpw(_prehash(password), hashed.encode())
     except ValueError:
         return False
 

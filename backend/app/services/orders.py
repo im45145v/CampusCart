@@ -137,7 +137,12 @@ async def create_order(db: Database, buyer: dict[str, Any], body: OrderIn) -> di
         "history": [{"status": status, "by": buyer["_id"], "at": now(), "reason": ""}],
         "created_at": now(), "updated_at": now(),
     }
-    await db.orders.insert_one(order)
+    try:
+        await db.orders.insert_one(order)
+    except Exception:
+        for r in reserved:
+            await _restore(db, r)
+        raise
     return order
 
 
