@@ -12,9 +12,9 @@ export function StoreCard({ store }: { store: Store }) {
     <Link to={`/stores/${store.id}`} className="block">
       <Card className="h-full overflow-hidden p-0 transition-shadow hover:shadow-md">
         <div className="relative h-28 w-full" style={{ background: `linear-gradient(135deg, ${t.accent}, ${t.primary})` }}>
-          {store.banner_url && <img src={store.banner_url} alt="" className="h-full w-full object-cover" />}
+          {store.banner_url && <img src={store.banner_url} alt="" referrerPolicy="no-referrer" className="h-full w-full object-cover" />}
           <div className="absolute -bottom-6 left-4 flex h-14 w-14 items-center justify-center overflow-hidden rounded-xl border-2 border-white bg-ivory font-heading text-xl font-extrabold text-forest/50 shadow">
-            {store.logo_url ? <img src={store.logo_url} alt="" className="h-full w-full object-cover" /> : store.name.slice(0, 1).toUpperCase()}
+            {store.logo_url ? <img src={store.logo_url} alt="" referrerPolicy="no-referrer" className="h-full w-full object-cover" /> : store.name.slice(0, 1).toUpperCase()}
           </div>
         </div>
         <div className="p-4 pt-8">
@@ -38,12 +38,12 @@ export function ProductCard({ product }: { product: Product }) {
     <Link to={`/products/${product.id}`} className="block">
       <Card className="h-full transition-shadow hover:shadow-md">
         <div className="mb-3 flex h-32 items-center justify-center overflow-hidden rounded-xl bg-ivory text-taupe">
-          {product.image_urls[0] ? <img src={product.image_urls[0]} alt="" className="h-full w-full object-cover" /> : <span className="text-sm">No photo</span>}
+          {product.image_urls[0] ? <img src={product.image_urls[0]} alt="" referrerPolicy="no-referrer" className="h-full w-full object-cover" /> : <span className="text-sm">No photo</span>}
         </div>
         <h3 className="font-bold">{product.title}</h3>
         <p className="text-terracotta font-semibold">
           {(product.variants.length > 0 || product.print_spec) && 'from '}{formatMoney(product.price_from_minor)}
-          {product.print_spec ? ' / page' : product.kind === 'printing' ? ' (quote)' : ''}
+          {product.print_spec ? ' / page' : product.kind === 'printing' ? ' (quote)' : product.listing_type === 'lend' ? ' borrow fee' : ''}
         </p>
         <div className="mt-1 flex gap-2">
           {product.in_stock ? <Badge tone="ok">Available</Badge> : <Badge tone="bad">Unavailable</Badge>}

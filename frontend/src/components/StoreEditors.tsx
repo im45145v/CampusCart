@@ -13,8 +13,7 @@ export function ImageUpload({ label, value, onChange, previewClass = 'h-24 w-40'
   const input = useRef<HTMLInputElement>(null)
   const [error, setError] = useState('')
   const [busy, setBusy] = useState(false)
-  const upload = async () => {
-    const file = input.current?.files?.[0]
+  const send = async (file?: File | null) => {
     if (!file) return
     const form = new FormData()
     form.append('file', file)
@@ -33,12 +32,18 @@ export function ImageUpload({ label, value, onChange, previewClass = 'h-24 w-40'
     <div className="space-y-2">
       <span className="text-sm font-medium text-forest">{label}</span>
       <div className="flex flex-wrap items-center gap-3">
-        <div className={`flex items-center justify-center overflow-hidden rounded-lg border border-dashed border-line bg-ivory text-xs text-taupe ${previewClass}`}>
-          {value ? <img src={value} alt="" className="h-full w-full object-cover" /> : 'No image'}
-        </div>
+        <label
+          className={`flex cursor-pointer items-center justify-center overflow-hidden rounded-lg border border-dashed border-line bg-ivory text-center text-xs text-taupe ${previewClass}`}
+          onDragOver={(e) => e.preventDefault()}
+          onDrop={(e) => { e.preventDefault(); void send(e.dataTransfer.files?.[0]) }}
+        >
+          {value
+            ? <img src={value} alt="" className="h-full w-full object-cover" onError={() => setError('The photo could not be shown. Choose it again.')} />
+            : busy ? 'Uploading…' : 'Click or drop a photo'}
+          <input ref={input} type="file" aria-label={label} accept="image/png,image/jpeg,image/webp,.png,.jpg,.jpeg,.webp" className="sr-only" onChange={(e) => void send(e.target.files?.[0])} />
+        </label>
         <div className="space-y-1">
-          <input ref={input} type="file" aria-label={label} accept="image/png,image/jpeg,image/webp" onChange={upload} className="block text-sm" />
-          <p className="text-xs text-taupe">PNG, JPEG or WebP, up to 2 MB.{busy && ' Uploading…'}</p>
+          <p className="text-xs text-taupe">PNG, JPEG or WebP, up to 2 MB.</p>
           {value && <Button type="button" variant="ghost" size="sm" onClick={() => onChange(null)}>Remove image</Button>}
         </div>
       </div>

@@ -1,6 +1,7 @@
 export type Role = 'buyer' | 'seller' | 'admin'
 export interface User { id: string; name: string; email: string; roles: Role[]; karma_balance: number; wallet_balance_minor: number }
-export type StoreCategory = 'food' | 'printing' | 'handmade' | 'goods' | 'services'
+export const STORE_CATEGORIES = ['food', 'printing', 'handmade', 'goods', 'services', 'lending'] as const
+export type StoreCategory = (typeof STORE_CATEGORIES)[number]
 export interface StoreTheme {
   primary: string; accent: string; background: string
   font: 'modern' | 'serif' | 'rounded'; radius: 'sharp' | 'soft' | 'pill'
@@ -46,6 +47,7 @@ export interface Product {
 export interface OrderLine {
   product_id: string; variant_id: string | null; title: string; variant_name: string | null
   unit_price_minor: number; quantity: number; line_total_minor: number
+  listing_type?: string
   addons?: { id: string; name: string; price_minor: number; quantity: number }[]
   print?: {
     file_url: string; pages: number; copies: number; color: 'bw' | 'color'

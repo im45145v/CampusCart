@@ -11,7 +11,7 @@ class Settings(BaseSettings):
     mongodb_db: str = "campuscart"
     jwt_secret: str = Field(default="dev-insecure-secret-change-me-0123456789", min_length=16)
     jwt_ttl_minutes: int = 60 * 12
-    cors_origins: str = "http://localhost:5173"
+    cors_origins: str = "http://localhost:5173,http://127.0.0.1:5173"
     environment: str = "development"
 
     upload_dir: str = "uploads"

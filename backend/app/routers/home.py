@@ -8,7 +8,7 @@ from .products import product_view
 
 router = APIRouter(prefix="/api", tags=["home"])
 
-CATEGORIES = ["food", "printing", "handmade", "goods", "services"]
+CATEGORIES = ["food", "printing", "handmade", "goods", "services", "lending"]
 
 
 @router.get("/health")

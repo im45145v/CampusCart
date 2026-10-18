@@ -19,7 +19,16 @@ npm ci
 npm run dev                    # http://localhost:5173
 npm run lint && npm run typecheck && npm test && npm run build
 ```
-Set `VITE_API_URL` when the API is on another origin (the WebSocket URL is derived from it).
+Set `VITE_API_URL` when the API is on another origin (the WebSocket URL is derived from it). The default `CORS_ORIGINS` allows both `http://localhost:5173` and `http://127.0.0.1:5173`, because the chat socket rejects any other page origin.
+
+## Demo stalls
+With the API running and MongoDB reachable:
+
+```bash
+cd backend && python -m scripts.seed_campus_stores
+```
+
+This creates Kaaram & Ko, Campus Brewers, and Tanuj Prints, approves them, publishes their listings, and loads ₹500 onto `student.buyer@campus.test` the first time. Running it again renames those stalls if they still have the old spelling, updates listings, and does not add another wallet load. Login emails stay the same. Accounts and the two-minute path are in the README. Catalogue photos are internet image URLs, so a Render restart does not empty the stalls.
 
 ## Optional integrations
 - **Gemma 4:** set `GEMMA_API_KEY` (Google AI Studio). Listing drafts and dictation call `generateContent` on `gemma-4-26b-a4b-it` (use `gemma-4-31b-it` if you prefer the larger model). Hosted 26B and 31B are text and image; if a recording is refused, type the note. `GEMMA_BASE_URL` still points drafts at a local OpenAI-compatible server instead.
@@ -31,11 +40,9 @@ allowed chat ids). The MCP server needs `pip install mcp`. Run `campuscart_edge.
 local model; whether any Gemma variant fits in 4 GB RAM is unmeasured. Summaries are rule-based and need no model.
 
 ## Deploy (Render + Atlas)
-`render.yaml` defines the API web service and the static site. Create an Atlas cluster, set `MONGODB_URI`, `CORS_ORIGINS`
-(static site URL) and `VITE_API_URL` (API URL). Uploaded images are written to local disk, which is ephemeral on Render:
-attach a persistent disk or move uploads to object storage before relying on them.
+Follow [deploy.md](deploy.md). `render.yaml` defines the API web service and the static site. Uploaded images and print files are written to local disk, which is ephemeral on Render.
 
 ## Known limitations
 - Chat connections and rate limits are per-process; multi-instance needs a shared pub/sub (Redis) and limiter.
-- Karma ledger, rental/exchange workflows, push notifications and email are not implemented (data model only).
-- Not verified: real MongoDB Atlas, a live Gemma 4 or ElevenLabs call, Telegram/MCP, UNO Q hardware, cross-browser UI.
+- A lending store holds a piece while it is borrowed and puts it back when the owner marks the order completed. There is no deposit ledger: the price is the borrow fee. Karma, a full rental calendar, push notifications, and email are not implemented.
+- Not verified: real MongoDB Atlas, a live Gemma 4 or ElevenLabs call on this machine (the studio reports that the assistant is not configured until `GEMMA_API_KEY` is set), Telegram/MCP, UNO Q hardware, cross-browser UI.

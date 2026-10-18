@@ -253,6 +253,7 @@ async def build_order_lines(
             "product_id": pid, "variant_id": vid, "title": p["title"], "variant_name": name,
             "unit_price_minor": price, "quantity": qty, "addons": chosen, "addons_minor": addons_minor,
             "line_total_minor": (price + addons_minor) * qty, "tracked": stock is not None, "print": None,
+            "listing_type": p.get("listing_type") or "new",
             "category": p.get("category") or "", "kind": p.get("kind") or "product",
         })
 
@@ -271,9 +272,55 @@ async def build_order_lines(
             "variant_name": name, "unit_price_minor": job["total_minor"], "quantity": 1,
             "addons": [], "addons_minor": 0, "line_total_minor": job["total_minor"],
             "tracked": stock is not None, "print": job,
+            "listing_type": p.get("listing_type") or "new",
             "category": p.get("category") or "", "kind": p.get("kind") or "printing",
         })
     return lines, needs_quote, prep_min
+
+
+def _seller_alert(order: dict[str, Any], buyer_name: str, store_name: str) -> tuple[str, str, str]:
+    """Title, body, and link the seller sees. A print job names the packet and the spec."""
+    jobs = [item["print"] for item in order.get("items") or [] if item.get("print")]
+    if not jobs:
+        borrowed = _borrow_alert(order, buyer_name)
+        if borrowed:
+            return borrowed
+        return "New order", f"{buyer_name} ordered from {store_name}", f"/orders/{order['_id']}"
+    packet = next(
+        (
+            str(answer.get("value") or "").strip()
+            for answer in order.get("answers") or []
+            if answer.get("id") == "packet" or "packet" in str(answer.get("label") or "").lower()
+        ),
+        "",
+    )
+    specs: list[str] = []
+    for job in jobs:
+        colour = "colour" if job.get("color") == "color" else "black and white"
+        urgent = ", urgent" if job.get("urgent") else ""
+        specs.append(
+            f"{int(job.get('copies') or 0)} copies, {int(job.get('pages') or 0)} pages, "
+            f"{colour}, {job.get('paper') or 'paper'}{urgent}"
+        )
+    body = f"Packet: {packet}. " if packet else ""
+    return "Print job", body + " ".join(specs), "/seller?tab=Orders"
+
+
+def _borrow_alert(order: dict[str, Any], buyer_name: str) -> tuple[str, str, str] | None:
+    """A lend line is a person handing over their own thing, not a sale."""
+    titles = [str(item.get("title") or "item") for item in order.get("items") or [] if item.get("listing_type") == "lend"]
+    if not titles:
+        return None
+    due = next(
+        (
+            str(answer.get("value") or "").strip()
+            for answer in order.get("answers") or []
+            if answer.get("id") == "return_by"
+        ),
+        "",
+    )
+    due_bit = f" Back by {due}." if due else ""
+    return "Borrow request", f"{buyer_name} wants {', '.join(titles)}.{due_bit}", "/seller?tab=Orders"
 
 
 async def create_order(db: Database, buyer: dict[str, Any], body: OrderIn) -> dict[str, Any]:
@@ -378,10 +425,9 @@ async def create_order(db: Database, buyer: dict[str, Any], body: OrderIn) -> di
             )
         raise
     await push_order(order)
+    title, message, href = _seller_alert(order, buyer["name"], store["name"])
     await notifications.notify(
-        db, store["owner_id"], "order", "New order",
-        f"{buyer['name']} ordered from {store['name']}",
-        f"/orders/{order['_id']}", order["_id"],
+        db, store["owner_id"], "order", title, message, href, order["_id"],
     )
     return order
 
@@ -428,6 +474,18 @@ async def change_status(
             await db.products.update_one(
                 {"_id": line["product_id"]}, {"$inc": {"sold_count": line["quantity"]}}
             )
+        # A borrow holds the piece until the owner marks it returned. A sale stays sold.
+        if order.get("stock_reserved") and any(
+            line.get("listing_type") == "lend" and line.get("tracked") for line in order["items"]
+        ):
+            cleared = await db.orders.update_one(
+                {"_id": order["_id"], "stock_reserved": True},
+                {"$set": {"stock_reserved": False}},
+            )
+            if cleared.modified_count == 1:
+                for line in order["items"]:
+                    if line.get("listing_type") == "lend" and line.get("tracked"):
+                        await _restore(db, line)
         await _credit_seller(db, order, charged_now)
     updated = await db.orders.find_one({"_id": order["_id"]})
     assert updated is not None

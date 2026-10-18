@@ -169,3 +169,29 @@ async def test_seller_summary_and_edge_tools(
     assert summary["orders_by_status"] == {"placed": 1}
     await client.delete(f"/api/seller/api-tokens/{tok['id']}", headers=seller.headers)
     assert (await client.get("/api/edge/pending-orders", headers=h)).status_code == 401
+
+
+async def test_returned_borrow_goes_back_on_the_shelf(
+    client: httpx.AsyncClient, seller: Actor, buyer: Actor, store: dict[str, Any]
+) -> None:
+    lent = await make_product(
+        client, seller, store, title="Projector", listing_type="lend", stock=1, price_minor=8000,
+    )
+    sold = await make_product(client, seller, store, title="Plate", stock=1, price_minor=1500)
+    borrow = await place(client, buyer, store, [{"product_id": lent["id"], "quantity": 1}])
+    assert borrow.status_code == 201, borrow.text
+    assert await stock_of(client, lent["id"]) == 0
+    sale = await place(client, buyer, store, [{"product_id": sold["id"], "quantity": 1}])
+    assert sale.status_code == 201
+    for status in ("accepted", "preparing", "ready", "completed"):
+        done = await client.post(
+            f"/api/orders/{borrow.json()['id']}/status", headers=seller.headers, json={"status": status},
+        )
+        assert done.status_code == 200, done.text
+    assert await stock_of(client, lent["id"]) == 1
+    for status in ("accepted", "preparing", "ready", "completed"):
+        done = await client.post(
+            f"/api/orders/{sale.json()['id']}/status", headers=seller.headers, json={"status": status},
+        )
+        assert done.status_code == 200, done.text
+    assert await stock_of(client, sold["id"]) == 0

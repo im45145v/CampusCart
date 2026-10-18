@@ -12,7 +12,7 @@ Email = Annotated[
 ]
 Text = Annotated[str, StringConstraints(strip_whitespace=True)]
 
-StoreCategory = Literal["food", "printing", "handmade", "goods", "services"]
+StoreCategory = Literal["food", "printing", "handmade", "goods", "services", "lending"]
 ProductKind = Literal["product", "service", "printing"]
 ListingType = Literal["new", "secondhand", "rent", "lend", "exchange"]
 

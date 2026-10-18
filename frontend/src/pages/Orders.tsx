@@ -12,7 +12,7 @@ import { useAuth } from '@/lib/auth'
 import { useLiveOrders } from '@/lib/live'
 import { formatMoney, formatTime, rupeesToMinor } from '@/lib/utils'
 import { useFetch } from '@/lib/useFetch'
-import type { Order, Review } from '@/lib/types'
+import type { Order, OrderLine, Review } from '@/lib/types'
 
 const PAYMENT: Record<string, string> = {
   pay_on_pickup: 'Pay on pickup',
@@ -74,11 +74,37 @@ const BUYER_NEXT: Record<string, string[]> = {
 const ACTION_LABEL: Record<string, string> = {
   accepted: 'Accept', rejected: 'Reject', preparing: 'Start preparing', ready: 'Mark ready', completed: 'Mark completed', cancelled: 'Cancel order',
 }
+const PRINT_ACTION_LABEL: Record<string, string> = {
+  accepted: 'Take the job', preparing: 'Start printing', ready: 'Packet is ready', completed: 'Handed over', cancelled: 'Cancel job',
+}
+const LEND_ACTION_LABEL: Record<string, string> = {
+  accepted: 'Accept the borrow', preparing: 'Ready to collect', ready: 'They collected it',
+  completed: 'Back on the shelf', rejected: 'Cannot lend', cancelled: 'Cancel borrow',
+}
+
+export function printSummary(job: NonNullable<OrderLine['print']>): string {
+  return [
+    `${job.copies} ${job.copies === 1 ? 'copy' : 'copies'}`,
+    `${job.pages} ${job.pages === 1 ? 'page' : 'pages'}`,
+    job.color === 'color' ? 'Colour' : 'Black and white',
+    job.paper,
+    job.sides === 'duplex' ? 'Double sided' : 'Single sided',
+    job.binding,
+  ].join(' · ')
+}
 
 export function OrderActions({ order, role, onChange }: { order: Order; role: 'buyer' | 'seller'; onChange: (o: Order) => void }) {
   const [error, setError] = useState('')
   const [quote, setQuote] = useState('')
   const next = (role === 'seller' ? SELLER_NEXT : BUYER_NEXT)[order.status] ?? []
+  const printing = role === 'seller' && order.items.some((line) => line.print)
+  const lending = role === 'seller' && order.items.some((line) => line.listing_type === 'lend')
+  const actionLabel = (status: string) => {
+    if (role === 'buyer' && status === 'accepted') return 'Approve quote'
+    if (printing && PRINT_ACTION_LABEL[status]) return PRINT_ACTION_LABEL[status]
+    if (lending && LEND_ACTION_LABEL[status]) return LEND_ACTION_LABEL[status]
+    return ACTION_LABEL[status]
+  }
   const act = async (status: string) => {
     setError('')
     try {
@@ -99,7 +125,7 @@ export function OrderActions({ order, role, onChange }: { order: Order; role: 'b
   return (
     <div className="space-y-3">
       <div className="flex flex-wrap gap-2">
-        {next.map((s) => <Button key={s} variant={s === 'rejected' || s === 'cancelled' ? 'secondary' : 'primary'} onClick={() => act(s)}>{role === 'buyer' && s === 'accepted' ? 'Approve quote' : ACTION_LABEL[s]}</Button>)}
+        {next.map((s) => <Button key={s} variant={s === 'rejected' || s === 'cancelled' ? 'secondary' : 'primary'} onClick={() => act(s)}>{actionLabel(s)}</Button>)}
         {role === 'seller' && order.payment_status === 'unpaid' && !['rejected', 'cancelled'].includes(order.status) && <Button variant="secondary" onClick={confirmPayment}>I received payment</Button>}
       </div>
       {role === 'seller' && ['quote_requested', 'quoted'].includes(order.status) && (
@@ -139,11 +165,11 @@ export function OrderDetail() {
               <div className="flex justify-between gap-3"><span>{l.quantity} × {l.title}{l.variant_name ? ` (${l.variant_name})` : ''}</span><span>{formatMoney(l.line_total_minor)}</span></div>
               {l.addons?.map((a) => <p key={a.id} className="text-sm text-taupe">{a.quantity} × {a.name} (+{formatMoney(a.price_minor)} each)</p>)}
               {l.print && (
-                <div className="mt-1 text-sm text-taupe">
-                  <p>{l.print.pages} pages, {l.print.copies} copies, {l.print.color === 'color' ? 'colour' : 'black and white'}, {l.print.paper}, {l.print.sides === 'duplex' ? 'double sided' : 'single sided'}, {l.print.binding}{l.print.urgent ? ', urgent' : ''}</p>
-                  <p>{l.print.impressions} impressions {formatMoney(l.print.impression_minor)} · {l.print.sheets} sheets {formatMoney(l.print.paper_minor)} · binding {formatMoney(l.print.binding_minor)}{l.print.urgent ? ` · urgent ${formatMoney(l.print.urgent_minor)}` : ''}</p>
+                <div className="mt-2 space-y-1 text-sm">
+                  <p className="font-semibold text-forest">{printSummary(l.print)}{l.print.urgent ? ' · Urgent' : ''}</p>
+                  <p className="text-taupe">{l.print.impressions} impressions {formatMoney(l.print.impression_minor)} · {l.print.sheets} sheets {formatMoney(l.print.paper_minor)} · binding {formatMoney(l.print.binding_minor)}{l.print.urgent ? ` · urgent ${formatMoney(l.print.urgent_minor)}` : ''}</p>
                   {l.print.note && <p>Note: {l.print.note}</p>}
-                  <a className="text-terracotta underline" href={l.print.file_url} target="_blank" rel="noreferrer">Open the file</a>
+                  <Button asChild size="sm"><a href={l.print.file_url} target="_blank" rel="noreferrer">Open the file</a></Button>
                 </div>
               )}
             </li>

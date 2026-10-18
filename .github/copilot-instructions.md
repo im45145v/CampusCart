@@ -25,7 +25,8 @@
 ## Domain rules
 - MongoDB documents use string UUID `_id` values.
 - Store money in integer minor units only (`price_minor`, `total_minor`, and similar fields); compute totals server-side.
-- Product `listing_type` is one of `new`, `secondhand`, `rent`, `lend`, or `exchange`.
+- Store `category` is `food`, `printing`, `handmade`, `goods`, `services`, or `lending`. A lending store is one student lending their own things.
+- Product `listing_type` is one of `new`, `secondhand`, `rent`, `lend`, or `exchange`. A `lend` line reserves stock while the borrow is open and returns that stock when the seller marks the order completed. The price is a borrow fee, not a held deposit.
 - Karma is a reputation concept and must stay separate from money or balances.
 - Order statuses are `placed`, `quote_requested`, `quoted`, `accepted`, `preparing`, `ready`, `completed`, `rejected`, `cancelled`; enforce transitions in `backend/app/services/orders.py`.
 - Decrement stock atomically with a conditional update (`$gte`) and restore it at most once on cancel or reject.

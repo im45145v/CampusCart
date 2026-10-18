@@ -12,12 +12,13 @@ UNO Q service (edge/uno_q) --read-only API token--> /api/edge/*
   be granted with `python -m scripts.create_admin <email>` (run from `backend/`). Permissions are enforced in
   `app/deps.py` and in each router (ownership checks).
 - **Money** is stored as integer minor units (`*_minor`). Totals are always computed by the server from stored prices.
-- **Catalogue:** one `products` shape serves food, printing, handmade, goods and services. A listing type field covers
-  new, second-hand, rent, lend and exchange. A karma value is a separate integer and never mixes with money
+- **Catalogue:** one `products` shape serves food, printing, handmade, goods, services, and lending. A listing type field covers
+  new, second-hand, rent, lend and exchange. A lending store is one student lending their own things. A karma value is a separate integer and never mixes with money
   (a karma ledger and exchange flow are not implemented yet).
 - **Orders** (`app/services/orders.py`): statuses `placed, quote_requested, quoted, accepted, preparing, ready,
   completed, rejected, cancelled`. Transitions are table-driven per actor. Stock is reserved with a conditional
   atomic update (`stock >= qty`) so concurrent orders cannot oversell; it is restored exactly once on cancel/reject.
+  A `lend` line is restored again when the owner marks the order completed, so the piece can be borrowed by the next student. A sale stays sold.
   Printing orders start as `quote_requested`; the seller sends a manual quote and the buyer approves it.
   Payment is pay-on-pickup, paid directly to the seller (seller confirms), or campus-wallet credits.
   Campus wallet is an on-campus ledger in `wallet_ledger`: the student records a top-up, staff can reverse it,
@@ -32,7 +33,7 @@ UNO Q service (edge/uno_q) --read-only API token--> /api/edge/*
 - **Live orders:** status, quote, and payment changes are pushed on the existing `/ws/chat` socket as `{type: "order"}`.
   The connection manager is still in-memory.
 - **Reviews:** one review per completed order, with optional quality, timing, and value scores. The store owner may reply once.
-- **Chat:** see [api.md](api.md#chat). Messages get a per-conversation monotonic `seq`; clients recover missed
+- **Chat:** the socket accepts a page only when its `Origin` is in `CORS_ORIGINS` (local defaults are `http://localhost:5173` and `http://127.0.0.1:5173`). See [api.md](api.md#chat). Messages get a per-conversation monotonic `seq`; clients recover missed
   messages with `after_seq` and page history with `before_seq`. A `presence` frame tells partners when someone
   connects or their last socket closes. The connection manager is in-memory, so with more than
   one backend instance a pub/sub layer (e.g. Redis) is required. Chat does not depend on AI/speech/edge integrations;
