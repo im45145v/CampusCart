@@ -48,7 +48,7 @@ services:
       - key: YOUPI_WEBHOOK_SECRET
         sync: false
       - key: ADMIN_UPI_ID
-        value: im45145v@oksbi
+        value: im45145v-2@okhdfcbank
   - type: web
     name: campuscart-youpi
     runtime: docker
@@ -65,7 +65,7 @@ services:
       - key: ENCRYPTION_MASTER_KEY
         sync: false
       - key: YOUPI_UPI_ID
-        value: im45145v@oksbi
+        value: im45145v-2@okhdfcbank
       - key: YOUPI_UPI_NAME
         value: UniCart
       - key: GMAIL_OBSERVER_PORT
