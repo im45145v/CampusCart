@@ -68,6 +68,18 @@ services:
         value: im45145v@oksbi
       - key: YOUPI_UPI_NAME
         value: UniCart
+      - key: GMAIL_OBSERVER_PORT
+        value: "6003"
+      - key: SMS_OBSERVER_PORT
+        value: "6002"
+      - key: GMAIL_REDIRECT_URI
+        value: https://campuscart-youpi.onrender.com/oauth/callback
+      - key: GMAIL_CLIENT_ID
+        sync: false
+      - key: GMAIL_CLIENT_SECRET
+        sync: false
+      - key: ANDROID_ENROLLMENT_SECRET
+        sync: false
       - key: SEED_DEMO
         sync: false
   - type: web

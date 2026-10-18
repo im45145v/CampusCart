@@ -15,6 +15,9 @@ export DEPLOYMENT_PREFIX="${host%%.*}"
 export CLOUDFLARE_DOMAIN="${host#*.}"
 export YOUPI_MODE=production
 export YOUPI_BIND_HOST=127.0.0.1
+export GMAIL_OBSERVER_PORT="${GMAIL_OBSERVER_PORT:-6003}"
+export SMS_OBSERVER_PORT="${SMS_OBSERVER_PORT:-6002}"
+export GMAIL_REDIRECT_URI="${GMAIL_REDIRECT_URI:-${BASE_CHECKOUT_URL}/oauth/callback}"
 
 node apps/payment-api/src/index.js &
 ready=0
@@ -29,6 +32,26 @@ if [ "$ready" != 1 ]; then
   echo "YouPI database did not accept the receiving UPI"
   exit 1
 fi
+
+node apps/gmail-observer/src/index.js &
+node apps/sms-observer/src/index.js &
+
+wait_observer() {
+  local port="$1"
+  local name="$2"
+  for _ in $(seq 1 30); do
+    if node --input-type=module -e "const r = await fetch('http://127.0.0.1:${port}/health'); if (!r.ok) process.exit(1)"; then
+      echo "${name} listening on ${port}"
+      return 0
+    fi
+    sleep 1
+  done
+  echo "${name} did not open port ${port}"
+  return 1
+}
+
+wait_observer "$GMAIL_OBSERVER_PORT" "Gmail observer"
+wait_observer "$SMS_OBSERVER_PORT" "SMS observer"
 
 node apps/checkout-portal/src/index.js &
 exec node /opt/render/proxy.mjs
