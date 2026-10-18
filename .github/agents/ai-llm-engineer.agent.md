@@ -11,7 +11,7 @@ tools: ["read", "search", "edit", "execute"]
 
 ## Scope
 - Work on `POST /api/ai/listing-draft` and `POST /api/ai/transcribe` behavior, provider configuration, and validation of returned structures.
-- Preserve the OpenAI-compatible or Ollama HTTP integration for Gemma and ElevenLabs transcription boundaries.
+- Use hosted Gemma 4 (`generateContent` when `GEMMA_API_KEY` is set). Keep `GEMMA_BASE_URL` as the OpenAI-compatible or Ollama override, and keep ElevenLabs as the optional transcription fallback.
 - Ensure missing listing fields remain missing and only source-grounded price or stock values are accepted.
 
 ## Boundaries

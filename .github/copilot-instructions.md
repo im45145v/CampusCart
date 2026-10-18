@@ -9,10 +9,10 @@
 - `backend/app/db.py`: Motor client setup and MongoDB indexes.
 - `backend/app/security.py`: bcrypt password hashing and JWT access tokens.
 - `backend/app/deps.py`: authentication and RBAC dependencies.
-- `backend/app/routers/`: feature routers for auth, stores, products, orders, chat, ws, reviews, reports, admin, ai, uploads, edge, and me.
+- `backend/app/routers/`: feature routers for auth, stores, products, orders, plans, wallet, chat, ws, reviews, reports, admin, ai, uploads, edge, and me.
 - `backend/app/services/orders.py`: order state machine and atomic inventory updates.
-- `backend/app/services/llm.py`: Gemma provider through an OpenAI-compatible or Ollama HTTP endpoint with validated JSON outputs.
-- `backend/app/services/speech.py`: ElevenLabs speech-to-text integration.
+- `backend/app/services/llm.py`: hosted Gemma 4 (`generateContent` on `gemma-4-26b-a4b-it`) when `GEMMA_API_KEY` is set; `GEMMA_BASE_URL` selects an OpenAI-compatible or Ollama server instead. Validated JSON only.
+- `backend/app/services/speech.py`: the same Gemma 4 model transcribes audio; ElevenLabs is the fallback when that key is set.
 - `backend/tests/`: pytest coverage using `mongomock-motor`, `httpx` ASGI client, and `starlette` `TestClient` for WebSockets.
 - `frontend/src/components/ui/`: shadcn-style primitives; use React Router, Lucide, and Vitest patterns already established in `frontend/`.
 - `edge/uno_q/`: separate Python service using scoped `cc_...` seller API tokens and optional Telegram or MCP integrations.
@@ -29,7 +29,8 @@
 - Karma is a reputation concept and must stay separate from money or balances.
 - Order statuses are `placed`, `quote_requested`, `quoted`, `accepted`, `preparing`, `ready`, `completed`, `rejected`, `cancelled`; enforce transitions in `backend/app/services/orders.py`.
 - Decrement stock atomically with a conditional update (`$gte`) and restore it at most once on cancel or reject.
-- Payments are pay-on-pickup or manually confirmed by the seller; never claim automated UPI verification.
+- Payments are pay-on-pickup, manually confirmed by the seller, or campus-wallet credits. The wallet is an on-campus ledger (self-recorded top-ups, staff reversal, desk payouts). Never claim automated UPI or bank verification. Karma stays separate from wallet balances.
+- Food extras add minor units on top of the catalogue price. Print jobs with a rate card are priced from the uploaded file; printing without a rate card stays a seller quote. Voucher discounts are computed on the server from the code's rules and released if the order is cancelled or rejected. In-app notifications are stored and pushed on the chat socket.
 - AI listing drafts never publish listings. `POST /api/ai/listing-draft` may only return price or stock when those values exist in the seller's source text; missing fields must remain missing. `POST /api/ai/transcribe` returns transcript text only.
 - Chat uses `POST /api/chat/ws-ticket` plus `/ws/chat?ticket=...`; tickets are single-use and expire after 60 seconds, messages persist before `ack`, sequence numbers are monotonic per conversation, and missed-message recovery uses `after_seq` / `before_seq` semantics.
 - Edge integrations must stay read-only against seller data unless the backend explicitly exposes a token-scoped endpoint. `edge/uno_q/` must never require shell or database access.

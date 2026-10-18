@@ -79,11 +79,18 @@ async def test_websocket_flow(
     tc = TestClient(app)
     with tc.websocket_connect(f"/ws/chat?ticket={tb}") as wb, tc.websocket_connect(f"/ws/chat?ticket={ts}") as wsel:
         assert wb.receive_json()["type"] == "ready" and wsel.receive_json()["type"] == "ready"
+        buyer_presence = [wb.receive_json(), wb.receive_json()]
+        seller_presence = wsel.receive_json()
+        assert {f["type"] for f in buyer_presence} == {"presence"}
+        assert seller_presence["type"] == "presence" and seller_presence["user_id"] == buyer.id and seller_presence["online"] is True
+        assert any(f["user_id"] == seller.id and f["online"] is True for f in buyer_presence)
         # sender identity spoofing is ignored: the connection decides who sent it
         wb.send_json({"type": "send", "conversation_id": c["id"], "text": "  hello  ", "client_id": "c1", "sender_id": seller.id})
         ack = wb.receive_json()
         assert ack["type"] == "ack" and ack["client_id"] == "c1"
         assert ack["message"]["sender_id"] == buyer.id and ack["message"]["text"] == "hello"
+        note = wsel.receive_json()
+        assert note["type"] == "notification" and note["notification"]["kind"] == "message"
         pushed = wsel.receive_json()
         assert pushed["type"] == "message" and pushed["message"]["id"] == ack["message"]["id"]
         # persisted before ack
@@ -136,6 +143,7 @@ async def test_websocket_rate_limit(
     tc = TestClient(app)
     with tc.websocket_connect(f"/ws/chat?ticket={await ticket(client, buyer)}") as w:
         w.receive_json()
+        assert w.receive_json()["type"] == "presence"
         codes = []
         for i in range(limit + 2):
             w.send_json({"type": "send", "conversation_id": c["id"], "text": "x", "client_id": f"k{i}"})

@@ -130,6 +130,33 @@ function SlotBuilder({ slots, onChange }: { slots: string[]; onChange: (s: strin
   )
 }
 
+const QUESTION_PACKS: { name: string; blurb: string; fields: CustomField[] }[] = [
+  {
+    name: 'Food stall', blurb: 'Hostel, spice, cutlery',
+    fields: [
+      { id: 'hostel', label: 'Hostel or block', type: 'select', required: true, options: ['A', 'B', 'C', 'D', 'Day scholar'] },
+      { id: 'spice', label: 'Spice level', type: 'select', required: false, options: ['Mild', 'Medium', 'Hot'] },
+      { id: 'cutlery', label: 'Include cutlery', type: 'checkbox', required: false, options: [] },
+    ],
+  },
+  {
+    name: 'Print shop', blurb: 'Paper, colour, sides',
+    fields: [
+      { id: 'paper', label: 'Paper size', type: 'select', required: true, options: ['A4', 'A3', 'Letter'] },
+      { id: 'colour', label: 'Colour or black and white', type: 'select', required: true, options: ['Black and white', 'Colour'] },
+      { id: 'sides', label: 'Sides', type: 'select', required: false, options: ['Single', 'Double'] },
+    ],
+  },
+  {
+    name: 'Lending desk', blurb: 'Return date and campus ID',
+    fields: [
+      { id: 'return_by', label: 'Return by (date)', type: 'text', required: true, options: [] },
+      { id: 'student_id', label: 'Last 4 of campus ID', type: 'text', required: true, options: [] },
+      { id: 'condition_ok', label: 'I will return it in the same condition', type: 'checkbox', required: true, options: [] },
+    ],
+  },
+]
+
 function QuestionEditor({ fields, onChange }: { fields: CustomField[]; onChange: (f: CustomField[]) => void }) {
   const patch = (i: number, p: Partial<CustomField>) => onChange(fields.map((f, j) => (j === i ? { ...f, ...p } : f)))
   const add = () => {
@@ -152,7 +179,20 @@ function QuestionEditor({ fields, onChange }: { fields: CustomField[]; onChange:
           </div>
         </div>
       ))}
-      {fields.length < 8 && <Button type="button" variant="secondary" onClick={add}><Plus className="h-4 w-4" aria-hidden /> Add a question</Button>}
+      <div className="flex flex-wrap gap-2">
+        {fields.length < 8 && <Button type="button" variant="secondary" onClick={add}><Plus className="h-4 w-4" aria-hidden /> Add a question</Button>}
+        {QUESTION_PACKS.map((pack) => (
+          <Button key={pack.name} type="button" variant="ghost" size="sm" onClick={() => {
+            const next = [...fields]
+            for (const field of pack.fields) {
+              if (next.length >= 8 || next.some((f) => f.id === field.id)) continue
+              next.push(field)
+            }
+            onChange(next)
+          }}>{pack.name}</Button>
+        ))}
+      </div>
+      <p className="text-xs text-taupe">Keep up to eight questions. Packs drop in the usual food, print, and lending questions; you can still edit each one.</p>
     </div>
   )
 }
@@ -172,6 +212,7 @@ export function OrderSettingsEditor({ value, onChange }: { value: OrderSettings;
         <Toggle label="Campus meetup" checked={value.fulfillment_options.includes('campus_meetup')} onChange={(v) => set('fulfillment_options', pick(value.fulfillment_options, 'campus_meetup', v))} />
         <Toggle label="Pay on pickup" checked={value.payment_options.includes('pay_on_pickup')} onChange={(v) => set('payment_options', pick(value.payment_options, 'pay_on_pickup', v))} />
         <Toggle label="Pay seller directly (you confirm receipt)" hint="CampusCart never processes or verifies payments." checked={value.payment_options.includes('manual_confirmation')} onChange={(v) => set('payment_options', pick(value.payment_options, 'manual_confirmation', v))} />
+        <Toggle label="Campus wallet" hint="Debits the buyer's campus credits when the price is known. Quotes are charged only after the buyer approves. Cancelled orders are credited back. This is not a bank payment." checked={value.payment_options.includes('campus_wallet')} onChange={(v) => set('payment_options', pick(value.payment_options, 'campus_wallet', v))} />
       </fieldset>
 
       <fieldset className="space-y-3">
@@ -207,7 +248,8 @@ export function OrderSettingsEditor({ value, onChange }: { value: OrderSettings;
       </fieldset>
 
       <fieldset className="space-y-3">
-        <legend className="font-semibold text-forest">Your own checkout questions</legend>
+        <legend className="font-semibold text-forest">Checkout questions</legend>
+        <p className="text-sm text-taupe">Ask several things while someone orders: hostel, spice, paper size, when a borrowed item comes back.</p>
         <QuestionEditor fields={value.custom_fields} onChange={(f) => set('custom_fields', f)} />
         <Field label="Message shown at checkout (optional)"><Textarea maxLength={300} className="min-h-16" value={value.order_instructions} onChange={(e) => set('order_instructions', e.target.value)} placeholder="e.g. Bring your ID card when you collect." /></Field>
       </fieldset>

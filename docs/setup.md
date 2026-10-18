@@ -22,8 +22,8 @@ npm run lint && npm run typecheck && npm test && npm run build
 Set `VITE_API_URL` when the API is on another origin (the WebSocket URL is derived from it).
 
 ## Optional integrations
-- **Gemma:** run an OpenAI-compatible server with an open-weight Gemma (e.g. Ollama) and set `GEMMA_BASE_URL`.
-- **ElevenLabs:** set `ELEVENLABS_API_KEY` for dictation. Neither has been exercised against the live service; tests use fakes.
+- **Gemma 4:** set `GEMMA_API_KEY` (Google AI Studio). Listing drafts and dictation call `generateContent` on `gemma-4-26b-a4b-it` (use `gemma-4-31b-it` if you prefer the larger model). Hosted 26B and 31B are text and image; if a recording is refused, type the note. `GEMMA_BASE_URL` still points drafts at a local OpenAI-compatible server instead.
+- **ElevenLabs:** optional dictation fallback when `ELEVENLABS_API_KEY` is set. Live Google and ElevenLabs calls are not exercised here; tests use fakes.
 
 ## UNO Q assistant
 See `edge/uno_q/` and the variables in `.env.example` (API URL, scoped API token from Seller Studio, Telegram token and
@@ -38,4 +38,4 @@ attach a persistent disk or move uploads to object storage before relying on the
 ## Known limitations
 - Chat connections and rate limits are per-process; multi-instance needs a shared pub/sub (Redis) and limiter.
 - Karma ledger, rental/exchange workflows, push notifications and email are not implemented (data model only).
-- Not verified: real MongoDB Atlas, live Gemma/ElevenLabs/Telegram/MCP, UNO Q hardware, cross-browser UI.
+- Not verified: real MongoDB Atlas, a live Gemma 4 or ElevenLabs call, Telegram/MCP, UNO Q hardware, cross-browser UI.

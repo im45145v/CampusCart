@@ -137,7 +137,22 @@ async def persist_message(
                   "updated_at": msg["created_at"]},
          "$inc": {f"unread.{recipient}": 1}},
     )
+    from . import notifications
+
+    await notifications.notify(
+        db, recipient, "message", "New message", text[:140],
+        f"/inbox?c={conv['_id']}", conv["_id"],
+    )
     return msg
+
+
+async def announce_presence(db: Database, user_id: str, online: bool) -> None:
+    """Tell conversation partners this user came online or left, and tell the user who is already here."""
+    async for conv in db.conversations.find({"participants": user_id}, {"participants": 1}):
+        other = next(p for p in conv["participants"] if p != user_id)
+        await manager.send(other, {"type": "presence", "user_id": user_id, "online": online})
+        if online:
+            await manager.send(user_id, {"type": "presence", "user_id": other, "online": manager.is_online(other)})
 
 
 async def deliver(conv: dict[str, Any], msg: dict[str, Any], skip: WebSocket | None = None) -> None:

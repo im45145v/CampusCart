@@ -2,6 +2,9 @@ import { Clock, Heart, MapPin, Megaphone, ShoppingBag, Star, Timer } from 'lucid
 import { useParams } from 'react-router-dom'
 import { MessageButton, ReportButton } from '@/components/ContactButtons'
 import { ProductCard } from '@/components/Cards'
+import { PlanCards } from '@/components/Memberships'
+import { OfferList } from '@/components/Vouchers'
+import { RatingBars, ReviewCard } from '@/components/Reviews'
 import { Empty, ErrorState, Loading } from '@/components/States'
 import { StoreBanner } from '@/components/StoreBanner'
 import { Badge } from '@/components/ui/badge'
@@ -10,9 +13,9 @@ import { Card } from '@/components/ui/card'
 import { api } from '@/lib/api'
 import { useAuth } from '@/lib/auth'
 import { themeStyle } from '@/lib/theme'
-import { formatMoney, formatTime } from '@/lib/utils'
+import { formatMoney } from '@/lib/utils'
 import { useFetch } from '@/lib/useFetch'
-import type { OrderOptions, Product, Review, Store } from '@/lib/types'
+import type { OrderOptions, Plan, Product, Review, Store, Subscription, Voucher } from '@/lib/types'
 
 export default function StorePage() {
   const { id = '' } = useParams()
@@ -20,6 +23,9 @@ export default function StorePage() {
   const store = useFetch<Store>(`/api/stores/${id}`)
   const products = useFetch<Product[]>(`/api/stores/${id}/products`)
   const reviews = useFetch<Review[]>(`/api/stores/${id}/reviews`)
+  const plans = useFetch<Plan[]>(`/api/stores/${id}/plans`)
+  const offers = useFetch<Voucher[]>(`/api/stores/${id}/vouchers`)
+  const subs = useFetch<Subscription[]>(user ? '/api/me/subscriptions' : null)
   const options = useFetch<OrderOptions>(`/api/stores/${id}/order-options`)
   const saved = useFetch<Store[]>(user ? '/api/me/saved-stores' : null)
   const isSaved = saved.data?.some((s) => s.id === id) ?? false
@@ -69,14 +75,23 @@ export default function StorePage() {
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">{products.data.map((p) => <ProductCard key={p.id} product={p} />)}</div>
         ) : <Empty title="This store has not published anything yet" />}
       </section>
+      {!!offers.data?.length && (
+        <section aria-labelledby="offers">
+          <h2 id="offers" className="mb-3 text-xl font-bold">Offers</h2>
+          <OfferList vouchers={offers.data} />
+        </section>
+      )}
+      {plans.data?.some((p) => p.active) && (
+        <section aria-labelledby="plans">
+          <h2 id="plans" className="mb-3 text-xl font-bold">Memberships</h2>
+          <PlanCards plans={(plans.data ?? []).filter((p) => p.active)} mine={(subs.data ?? []).filter((sub) => sub.store_id === id)} onChanged={() => { void subs.reload(); void plans.reload() }} />
+        </section>
+      )}
       <section aria-labelledby="sr">
         <h2 id="sr" className="mb-3 text-xl font-bold">Reviews</h2>
+        <RatingBars hist={s.rating_hist} count={s.rating_count} />
         {reviews.data?.length ? (
-          <ul className="space-y-3">
-            {reviews.data.map((r) => (
-              <li key={r.id}><Card><p className="font-semibold">{'★'.repeat(r.rating)}<span className="sr-only"> {r.rating} out of 5</span> <span className="font-normal text-taupe">by {r.buyer_name}, {formatTime(r.created_at)}</span></p>{r.comment && <p>{r.comment}</p>}</Card></li>
-            ))}
-          </ul>
+          <ul className="space-y-3">{reviews.data.map((r) => <li key={r.id}><ReviewCard review={r} /></li>)}</ul>
         ) : <p className="text-taupe">No reviews yet. Reviews come from completed orders.</p>}
       </section>
     </div>

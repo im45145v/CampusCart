@@ -1,16 +1,29 @@
-import { useState } from 'react'
+import { useCallback, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
+import { ReviewCard, ReviewForm } from '@/components/Reviews'
 import { MessageButton, ReportButton } from '@/components/ContactButtons'
 import { Empty, ErrorState, Loading, Notice } from '@/components/States'
 import { Badge, statusTone } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
-import { Field, Input, Select } from '@/components/ui/input'
+import { Field, Input } from '@/components/ui/input'
 import { api } from '@/lib/api'
 import { useAuth } from '@/lib/auth'
+import { useLiveOrders } from '@/lib/live'
 import { formatMoney, formatTime, rupeesToMinor } from '@/lib/utils'
 import { useFetch } from '@/lib/useFetch'
-import type { Order } from '@/lib/types'
+import type { Order, Review } from '@/lib/types'
+
+const PAYMENT: Record<string, string> = {
+  pay_on_pickup: 'Pay on pickup',
+  manual_confirmation: 'Paid directly to the seller',
+  campus_wallet: 'Campus wallet',
+}
+const PAY_STATUS: Record<string, string> = {
+  unpaid: 'not yet confirmed by the seller',
+  confirmed_by_seller: 'confirmed by the seller',
+  wallet_paid: 'paid from the campus wallet',
+}
 
 export const statusLabel = (s: string) => s.replace('_', ' ')
 
@@ -97,33 +110,19 @@ export function OrderActions({ order, role, onChange }: { order: Order; role: 'b
   )
 }
 
-function ReviewForm({ orderId }: { orderId: string }) {
-  const [rating, setRating] = useState('5')
-  const [comment, setComment] = useState('')
-  const [msg, setMsg] = useState<{ tone: 'ok' | 'bad'; text: string } | null>(null)
-  const submit = async () => {
-    try {
-      await api(`/api/orders/${orderId}/review`, { method: 'POST', body: { rating: Number(rating), comment } })
-      setMsg({ tone: 'ok', text: 'Thanks for your review!' })
-    } catch (e) {
-      setMsg({ tone: 'bad', text: e instanceof Error ? e.message : 'Failed' })
-    }
-  }
-  return (
-    <Card className="space-y-3">
-      <h2 className="font-bold">Review this order</h2>
-      <Field label="Rating"><Select value={rating} onChange={(e) => setRating(e.target.value)}>{[5, 4, 3, 2, 1].map((n) => <option key={n} value={n}>{n} star{n > 1 ? 's' : ''}</option>)}</Select></Field>
-      <Field label="Comment"><Input value={comment} onChange={(e) => setComment(e.target.value)} maxLength={2000} /></Field>
-      <Button onClick={submit}>Submit review</Button>
-      {msg && <Notice tone={msg.tone}>{msg.text}</Notice>}
-    </Card>
-  )
+function OrderReview({ orderId, completed }: { orderId: string; completed: boolean }) {
+  const review = useFetch<{ review: Review | null }>(`/api/orders/${orderId}/review`)
+  if (review.data?.review) return <ReviewCard review={review.data.review} />
+  if (!completed) return null
+  return <ReviewForm orderId={orderId} onDone={() => void review.reload()} />
 }
 
 export function OrderDetail() {
   const { id = '' } = useParams()
   const { user } = useAuth()
   const { data, loading, error, reload, setData } = useFetch<Order>(`/api/orders/${id}`)
+  const apply = useCallback((order: Order) => { if (order.id === id) setData(order) }, [id, setData])
+  const live = useLiveOrders(apply)
   if (loading) return <Loading />
   if (error || !data) return <ErrorState message={error ?? 'Order not found'} onRetry={reload} />
   const role = data.buyer_id === user?.id ? 'buyer' : 'seller'
@@ -135,10 +134,26 @@ export function OrderDetail() {
       </div>
       <Card className="space-y-3">
         <ul className="divide-y divide-line">
-          {data.items.map((l, i) => <li key={i} className="flex justify-between py-2"><span>{l.quantity} × {l.title}{l.variant_name ? ` (${l.variant_name})` : ''}</span><span>{formatMoney(l.line_total_minor)}</span></li>)}
+          {data.items.map((l, i) => (
+            <li key={i} className="py-2">
+              <div className="flex justify-between gap-3"><span>{l.quantity} × {l.title}{l.variant_name ? ` (${l.variant_name})` : ''}</span><span>{formatMoney(l.line_total_minor)}</span></div>
+              {l.addons?.map((a) => <p key={a.id} className="text-sm text-taupe">{a.quantity} × {a.name} (+{formatMoney(a.price_minor)} each)</p>)}
+              {l.print && (
+                <div className="mt-1 text-sm text-taupe">
+                  <p>{l.print.pages} pages, {l.print.copies} copies, {l.print.color === 'color' ? 'colour' : 'black and white'}, {l.print.paper}, {l.print.sides === 'duplex' ? 'double sided' : 'single sided'}, {l.print.binding}{l.print.urgent ? ', urgent' : ''}</p>
+                  <p>{l.print.impressions} impressions {formatMoney(l.print.impression_minor)} · {l.print.sheets} sheets {formatMoney(l.print.paper_minor)} · binding {formatMoney(l.print.binding_minor)}{l.print.urgent ? ` · urgent ${formatMoney(l.print.urgent_minor)}` : ''}</p>
+                  {l.print.note && <p>Note: {l.print.note}</p>}
+                  <a className="text-terracotta underline" href={l.print.file_url} target="_blank" rel="noreferrer">Open the file</a>
+                </div>
+              )}
+            </li>
+          ))}
         </ul>
+        {!!data.discount_minor && <p className="text-right text-sm text-forest">Membership discount −{formatMoney(data.discount_minor)}</p>}
+        {!!data.voucher_discount_minor && <p className="text-right text-sm text-forest">Code {data.voucher_code} −{formatMoney(data.voucher_discount_minor)}</p>}
         <p className="text-right text-lg font-bold">{data.total_minor ? formatMoney(data.total_minor) : `Awaiting quote (estimate ${formatMoney(data.estimated_minor)})`}</p>
-        <p className="text-sm text-taupe">{data.fulfillment === 'pickup' ? 'Pickup' : 'Campus meetup'} · {data.payment_method === 'pay_on_pickup' ? 'Pay on pickup' : 'Paid directly to seller'} · Payment {data.payment_status === 'unpaid' ? 'not yet confirmed by seller' : 'confirmed by seller'}</p>
+        <p className="text-sm text-taupe">{data.fulfillment === 'pickup' ? 'Pickup' : 'Campus meetup'} · {PAYMENT[data.payment_method] ?? data.payment_method} · Payment {PAY_STATUS[data.payment_status] ?? data.payment_status}</p>
+        {live === 'online' && <p className="text-xs text-forest">Live updates are on.</p>}
         {role === 'seller' && <p className="text-sm">Buyer: {data.buyer_name}</p>}
         {data.pickup_slot && <p className="text-sm font-semibold text-forest">Pickup slot: {slotText(data.pickup_slot)}</p>}
         {!!data.est_wait_min && !['completed', 'rejected', 'cancelled'].includes(data.status) && <p className="text-sm">Estimated wait when placed: about {data.est_wait_min} min</p>}
@@ -155,7 +170,7 @@ export function OrderDetail() {
         <MessageButton storeId={data.store_id} orderId={data.id} label={role === 'buyer' ? 'Message seller' : 'Message buyer'} />
         <ReportButton targetType="order" targetId={data.id} />
       </div>
-      {role === 'buyer' && data.status === 'completed' && <ReviewForm orderId={data.id} />}
+      {role === 'buyer' && <OrderReview orderId={data.id} completed={data.status === 'completed'} />}
     </div>
   )
 }

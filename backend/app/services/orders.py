@@ -5,8 +5,10 @@ from typing import Any
 from fastapi import HTTPException
 
 from ..db import Database
-from ..schemas import OrderIn, OrderSettings
+from ..schemas import AddonPick, OrderIn, OrderSettings
 from ..util import new_id, now
+from . import notifications, printing, subscriptions, vouchers, wallet
+from .live import push_order
 
 TERMINAL = {"completed", "rejected", "cancelled"}
 QUEUE_STATUSES = ["placed", "accepted", "preparing"]
@@ -163,6 +165,117 @@ def _check_answers(cfg: OrderSettings, answers: dict[str, str]) -> list[dict[str
     return result
 
 
+def _priced_addons(product: dict[str, Any], picks: list[AddonPick]) -> tuple[list[dict[str, Any]], int]:
+    catalog = {a["id"]: a for a in product.get("addons") or []}
+    if picks and not catalog:
+        raise HTTPException(422, "This item has no extras")
+    chosen: list[dict[str, Any]] = []
+    per_unit = 0
+    for pick in picks:
+        addon = catalog.get(pick.id)
+        if not addon:
+            raise HTTPException(422, "Unknown extra")
+        if pick.quantity > int(addon.get("max_qty") or 1):
+            raise HTTPException(422, f"At most {addon['max_qty']} × {addon['name']}")
+        chosen.append({
+            "id": addon["id"], "name": addon["name"],
+            "price_minor": addon["price_minor"], "quantity": pick.quantity,
+        })
+        per_unit += int(addon["price_minor"]) * pick.quantity
+    return chosen, per_unit
+
+
+def _order_files(extra: list[str], lines: list[dict[str, Any]]) -> list[str]:
+    urls: list[str] = []
+    for line in lines:
+        printed = line.get("print") or {}
+        if printed.get("file_url"):
+            urls.append(printed["file_url"])
+    for url in extra:
+        if url not in urls:
+            urls.append(url)
+    return urls[:5]
+
+
+async def build_order_lines(
+    db: Database, store: dict[str, Any], items: list[Any]
+) -> tuple[list[dict[str, Any]], bool, int]:
+    cfg = store_settings(store)
+    merged: OrderedDict[tuple[Any, ...], int] = OrderedDict()
+    singles: list[Any] = []
+    for it in items:
+        if it.print_job:
+            if it.quantity != 1 or it.addons:
+                raise HTTPException(422, "Set copies on the print job. Print jobs do not take food extras.")
+            singles.append(it)
+            continue
+        if len({a.id for a in it.addons}) != len(it.addons):
+            raise HTTPException(422, "Choose each extra once")
+        signature = tuple(sorted((a.id, a.quantity) for a in it.addons))
+        key = (it.product_id, it.variant_id, signature)
+        merged[key] = merged.get(key, 0) + it.quantity
+
+    lines: list[dict[str, Any]] = []
+    needs_quote = False
+    prep_min = 0
+
+    async def load_product(pid: str) -> dict[str, Any]:
+        p = await db.products.find_one(
+            {"_id": pid, "store_id": store["_id"], "published": True, "moderation_status": "active"}
+        )
+        if not p or not p.get("available"):
+            raise HTTPException(409, f"Item {pid} is not available")
+        return p
+
+    def base_price(p: dict[str, Any], vid: str | None) -> tuple[int, str | None, Any]:
+        variants = p.get("variants") or []
+        if variants:
+            v = next((x for x in variants if x["id"] == vid), None)
+            if not v:
+                raise HTTPException(422, "Variant required or invalid")
+            return v["price_minor"], v["name"], v.get("stock")
+        if vid:
+            raise HTTPException(422, "Invalid variant")
+        return p["price_minor"], None, p.get("stock")
+
+    for (pid, vid, signature), qty in merged.items():
+        if qty > cfg.max_qty_per_item:
+            raise HTTPException(422, f"This store allows at most {cfg.max_qty_per_item} of each item")
+        p = await load_product(pid)
+        prep_min = max(prep_min, int(p.get("prep_time_min") or 0))
+        if p["kind"] == "printing" and p.get("print_spec"):
+            raise HTTPException(422, "Upload a file and choose the print settings")
+        if p["kind"] == "printing":
+            needs_quote = True
+        price, name, stock = base_price(p, vid)
+        chosen, addons_minor = _priced_addons(p, [AddonPick(id=i, quantity=q) for i, q in signature])
+        lines.append({
+            "product_id": pid, "variant_id": vid, "title": p["title"], "variant_name": name,
+            "unit_price_minor": price, "quantity": qty, "addons": chosen, "addons_minor": addons_minor,
+            "line_total_minor": (price + addons_minor) * qty, "tracked": stock is not None, "print": None,
+            "category": p.get("category") or "", "kind": p.get("kind") or "product",
+        })
+
+    for it in singles:
+        p = await load_product(it.product_id)
+        prep_min = max(prep_min, int(p.get("prep_time_min") or 0))
+        price, name, stock = base_price(p, it.variant_id)
+        spec = p.get("print_spec")
+        job_in = it.print_job
+        if p["kind"] != "printing" or not spec or job_in is None:
+            raise HTTPException(422, "That item is not a priced print job")
+        inspected = printing.inspect_upload(job_in.file_url)
+        job = printing.price_job(spec, job_in.model_dump(), inspected["pages"])
+        lines.append({
+            "product_id": it.product_id, "variant_id": it.variant_id, "title": p["title"],
+            "variant_name": name, "unit_price_minor": job["total_minor"], "quantity": 1,
+            "addons": [], "addons_minor": 0, "line_total_minor": job["total_minor"],
+            "tracked": stock is not None, "print": job,
+            "category": p.get("category") or "", "kind": p.get("kind") or "printing",
+        })
+    return lines, needs_quote, prep_min
+
+
 async def create_order(db: Database, buyer: dict[str, Any], body: OrderIn) -> dict[str, Any]:
     store = await db.stores.find_one({"_id": body.store_id, "status": "active"})
     if not store:
@@ -179,45 +292,23 @@ async def create_order(db: Database, buyer: dict[str, Any], body: OrderIn) -> di
         raise HTTPException(422, "This store does not accept that payment option")
     slot = _check_slot(cfg, body)
     answers = _check_answers(cfg, body.answers)
+    lines, needs_quote, prep_min = await build_order_lines(db, store, body.items)
 
-    merged: OrderedDict[tuple[str, str | None], int] = OrderedDict()
-    for it in body.items:
-        key = (it.product_id, it.variant_id)
-        merged[key] = merged.get(key, 0) + it.quantity
-
-    lines: list[dict[str, Any]] = []
-    needs_quote = False
-    prep_min = 0
-    for (pid, vid), qty in merged.items():
-        if qty > cfg.max_qty_per_item:
-            raise HTTPException(422, f"This store allows at most {cfg.max_qty_per_item} of each item")
-        p = await db.products.find_one(
-            {"_id": pid, "store_id": store["_id"], "published": True, "moderation_status": "active"}
-        )
-        if not p or not p.get("available"):
-            raise HTTPException(409, f"Item {pid} is not available")
-        prep_min = max(prep_min, int(p.get("prep_time_min") or 0))
-        variants = p.get("variants") or []
-        if variants:
-            v = next((x for x in variants if x["id"] == vid), None)
-            if not v:
-                raise HTTPException(422, "Variant required or invalid")
-            price, name, stock = v["price_minor"], v["name"], v.get("stock")
-        else:
-            if vid:
-                raise HTTPException(422, "Invalid variant")
-            price, name, stock = p["price_minor"], None, p.get("stock")
-        if p["kind"] == "printing":
-            needs_quote = True
-        lines.append({
-            "product_id": pid, "variant_id": vid, "title": p["title"], "variant_name": name,
-            "unit_price_minor": price, "quantity": qty, "line_total_minor": price * qty,
-            "tracked": stock is not None,
-        })
-
-    estimated = sum(x["line_total_minor"] for x in lines)
+    catalogue = sum(x["line_total_minor"] for x in lines if not x.get("print"))
+    printed = sum(x["line_total_minor"] for x in lines if x.get("print"))
+    estimated = catalogue + printed
     if not needs_quote and estimated < cfg.min_order_minor:
         raise HTTPException(422, f"Minimum order for this store is {cfg.min_order_minor / 100:.2f}")
+    discount_minor = 0
+    subscription_id = None
+    if not needs_quote and catalogue > 0:
+        pct, subscription_id = await subscriptions.best_discount(db, buyer["_id"], store["_id"])
+        discount_minor = catalogue * pct // 100
+    offer = await vouchers.evaluate(
+        db, buyer, store["_id"], lines, needs_quote, body.payment_method, body.voucher_code, discount_minor,
+    )
+    voucher_discount = int(offer["discount_minor"]) if offer else 0
+    payable = 0 if needs_quote else estimated - discount_minor - voucher_discount
     wait_min = await queue_wait_min(db, store, cfg) + prep_min
 
     reserved: list[dict[str, Any]] = []
@@ -236,16 +327,38 @@ async def create_order(db: Database, buyer: dict[str, Any], body: OrderIn) -> di
         "_id": new_id(), "buyer_id": buyer["_id"], "buyer_name": buyer["name"],
         "seller_id": store["owner_id"], "store_id": store["_id"], "store_name": store["name"],
         "items": lines,
-        "total_minor": 0 if needs_quote else estimated,
-        "estimated_minor": estimated,
+        "total_minor": payable,
+        "estimated_minor": estimated, "discount_minor": discount_minor,
+        "subscription_id": subscription_id,
+        "voucher_code": offer["code"] if offer else None,
+        "voucher_title": offer["title"] if offer else None,
+        "voucher_discount_minor": voucher_discount,
         "fulfillment": body.fulfillment, "payment_method": body.payment_method,
         "pickup_slot": slot, "answers": answers, "est_wait_min": wait_min,
-        "payment_status": "unpaid", "note": body.note, "request_details": body.request_details,
-        "file_urls": body.file_urls, "status": status, "stock_reserved": bool(reserved),
+        "payment_status": "unpaid", "wallet_charged_minor": 0,
+        "wallet_refunded": False, "seller_credited": False,
+        "note": body.note, "request_details": body.request_details,
+        "file_urls": _order_files(body.file_urls, lines), "status": status, "stock_reserved": bool(reserved),
         "history": [{"status": status, "by": buyer["_id"], "at": now(), "reason": ""}],
         "created_at": now(), "updated_at": now(),
     }
+    charged_amount = 0
+    held = False
     try:
+        if offer:
+            await vouchers.hold(
+                db, offer["voucher"], buyer["_id"], order["_id"], store["_id"], voucher_discount,
+            )
+            held = True
+        if body.payment_method == "campus_wallet" and not needs_quote:
+            if payable > 0:
+                await wallet.debit(
+                    db, buyer["_id"], payable, "order_payment",
+                    note=store["name"], related_id=order["_id"],
+                )
+                charged_amount = payable
+            order["wallet_charged_minor"] = payable
+            order["payment_status"] = "wallet_paid"
         await db.orders.insert_one(order)
         # Re-count after insert so two simultaneous buyers cannot both take the last place.
         if slot and cfg.slot_capacity and await _slot_count(
@@ -256,7 +369,20 @@ async def create_order(db: Database, buyer: dict[str, Any], body: OrderIn) -> di
     except Exception:
         for r in reserved:
             await _restore(db, r)
+        if held:
+            await vouchers.release(db, order["_id"])
+        if charged_amount:
+            await wallet.credit(
+                db, buyer["_id"], charged_amount, "order_refund",
+                note=store["name"], related_id=order["_id"],
+            )
         raise
+    await push_order(order)
+    await notifications.notify(
+        db, store["owner_id"], "order", "New order",
+        f"{buyer['name']} ordered from {store['name']}",
+        f"/orders/{order['_id']}", order["_id"],
+    )
     return order
 
 
@@ -265,20 +391,87 @@ async def change_status(
 ) -> dict[str, Any]:
     current = order["status"]
     check_transition(role, current, target)
+    charged_now = 0
+    if (
+        target == "accepted"
+        and order.get("payment_method") == "campus_wallet"
+        and int(order.get("wallet_charged_minor") or 0) == 0
+    ):
+        charged_now = int(order.get("total_minor") or 0)
+        if charged_now > 0:
+            await wallet.debit(
+                db, order["buyer_id"], charged_now, "order_payment",
+                note=order.get("store_name", ""), related_id=order["_id"],
+            )
+    sets: dict[str, Any] = {"status": target, "updated_at": now()}
+    if charged_now:
+        sets["wallet_charged_minor"] = charged_now
+        sets["payment_status"] = "wallet_paid"
     res = await db.orders.update_one(
         {"_id": order["_id"], "status": current},
-        {"$set": {"status": target, "updated_at": now()},
+        {"$set": sets,
          "$push": {"history": {"status": target, "by": actor["_id"], "at": now(), "reason": reason}}},
     )
     if res.modified_count != 1:
+        if charged_now:
+            await wallet.credit(
+                db, order["buyer_id"], charged_now, "order_refund",
+                note=order.get("store_name", ""), related_id=order["_id"],
+            )
         raise HTTPException(409, "Order was modified concurrently, reload and retry")
     if target in {"cancelled", "rejected"}:
         await release_stock(db, order)
+        await _refund_wallet(db, order, charged_now)
+        await vouchers.release(db, order["_id"])
     if target == "completed":
         for line in order["items"]:
             await db.products.update_one(
                 {"_id": line["product_id"]}, {"$inc": {"sold_count": line["quantity"]}}
             )
+        await _credit_seller(db, order, charged_now)
     updated = await db.orders.find_one({"_id": order["_id"]})
     assert updated is not None
+    await push_order(updated)
+    if actor["_id"] == updated["buyer_id"]:
+        await notifications.notify(
+            db, updated["seller_id"], "order", "Order update",
+            f"{updated['buyer_name']} set an order to {target}",
+            f"/orders/{updated['_id']}", updated["_id"],
+        )
+    else:
+        await notifications.notify(
+            db, updated["buyer_id"], "order", "Order update",
+            f"{updated.get('store_name', 'The store')} set your order to {target}",
+            f"/orders/{updated['_id']}", updated["_id"],
+        )
     return updated  # type: ignore[no-any-return]
+
+
+async def _refund_wallet(db: Database, order: dict[str, Any], charged_now: int) -> None:
+    amount = int(order.get("wallet_charged_minor") or 0) or charged_now
+    if amount <= 0 or order.get("wallet_refunded"):
+        return
+    res = await db.orders.update_one(
+        {"_id": order["_id"], "wallet_refunded": {"$ne": True}},
+        {"$set": {"wallet_refunded": True}},
+    )
+    if res.modified_count == 1:
+        await wallet.credit(
+            db, order["buyer_id"], amount, "order_refund",
+            note=order.get("store_name", ""), related_id=order["_id"],
+        )
+
+
+async def _credit_seller(db: Database, order: dict[str, Any], charged_now: int) -> None:
+    amount = int(order.get("wallet_charged_minor") or 0) or charged_now
+    if amount <= 0 or order.get("wallet_refunded"):
+        return
+    res = await db.orders.update_one(
+        {"_id": order["_id"], "seller_credited": {"$ne": True}, "wallet_refunded": {"$ne": True}},
+        {"$set": {"seller_credited": True}},
+    )
+    if res.modified_count == 1:
+        await wallet.credit(
+            db, order["seller_id"], amount, "order_earning",
+            note=order.get("store_name", ""), related_id=order["_id"],
+        )

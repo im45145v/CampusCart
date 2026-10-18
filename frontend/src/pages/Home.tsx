@@ -26,9 +26,9 @@ export default function Home() {
     <div className="space-y-10">
       <section className="rounded-3xl bg-forest px-6 py-10 text-white sm:px-10">
         <h1 className="max-w-xl font-heading text-3xl font-extrabold leading-tight text-white sm:text-4xl">
-          Everything your campus makes, bakes and prints, in one place.
+          Food, print, and the things you lend, from the people on your campus.
         </h1>
-        <p className="mt-3 max-w-lg text-white/80">Find student-run food, printing, handmade goods and services. Order, chat with the seller, pick up.</p>
+        <p className="mt-3 max-w-lg text-white/80">Order from student stores, borrow what is listed to lend, and pay with campus wallet credits or when you pick up.</p>
         <form onSubmit={submit} role="search" className="mt-6 flex max-w-xl gap-2">
           <label className="sr-only" htmlFor="home-search">Search products and stores</label>
           <Input id="home-search" value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search samosas, posters, notes…" className="h-12" />

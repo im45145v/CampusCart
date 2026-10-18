@@ -12,6 +12,7 @@ export default function Browse() {
   const category = sp.get('category') ?? ''
   const max = sp.get('max') ?? ''
   const available = sp.get('available') ?? ''
+  const listing = sp.get('listing') ?? ''
   const set = (k: string, v: string) => {
     const n = new URLSearchParams(sp)
     if (v) n.set(k, v)
@@ -19,7 +20,7 @@ export default function Browse() {
     setSp(n, { replace: true })
   }
   const products = useFetch<Product[]>('/api/products', {
-    q, max_price: max ? rupeesToMinor(max) : undefined, in_stock: available === '1' ? true : undefined,
+    q, listing_type: listing || undefined, max_price: max ? rupeesToMinor(max) : undefined, in_stock: available === '1' ? true : undefined,
   })
   const stores = useFetch<Store[]>('/api/stores', { q, category: category || undefined })
   const shown = (products.data ?? []).filter((p) => !category || p.category === category || stores.data?.some((s) => s.id === p.store_id))
@@ -27,7 +28,7 @@ export default function Browse() {
   return (
     <div className="space-y-6">
       <h1 className="text-2xl font-extrabold">Browse</h1>
-      <form role="search" className="grid gap-3 rounded-2xl border border-line bg-card p-4 sm:grid-cols-4" onSubmit={(e) => e.preventDefault()}>
+      <form role="search" className="grid gap-3 rounded-2xl border border-line bg-card p-4 sm:grid-cols-5" onSubmit={(e) => e.preventDefault()}>
         <Field label="Search"><Input value={q} onChange={(e) => set('q', e.target.value)} placeholder="Product or store" /></Field>
         <Field label="Category">
           <Select value={category} onChange={(e) => set('category', e.target.value)}>
@@ -36,6 +37,12 @@ export default function Browse() {
           </Select>
         </Field>
         <Field label="Max price (₹)"><Input type="number" min={0} value={max} onChange={(e) => set('max', e.target.value)} /></Field>
+        <Field label="Listing">
+          <Select value={listing} onChange={(e) => set('listing', e.target.value)}>
+            <option value="">Any</option>
+            {['new', 'secondhand', 'rent', 'lend', 'exchange'].map((c) => <option key={c} value={c}>{c}</option>)}
+          </Select>
+        </Field>
         <Field label="Availability">
           <Select value={available} onChange={(e) => set('available', e.target.value)}>
             <option value="">Any</option><option value="1">In stock only</option>

@@ -1,4 +1,5 @@
 import { MessageSquare, ShoppingBag, Store as StoreIcon, UserRound } from 'lucide-react'
+import { Notifications } from './Notifications'
 import { Link, NavLink, Outlet, Navigate, useLocation } from 'react-router-dom'
 import { useAuth } from '@/lib/auth'
 import { useCart } from '@/lib/cartContext'
@@ -29,6 +30,7 @@ export function Layout() {
           </NavLink>
           {user ? (
             <>
+              <Notifications />
               <NavLink to="/inbox" className={nav} aria-label={`Messages, ${unread} unread${status === 'offline' ? ', offline' : ''}`}>
                 <MessageSquare className="inline h-4 w-4" aria-hidden />
                 {unread > 0 && <span className="ml-1 rounded-full bg-terracotta px-1.5 text-xs">{unread}</span>}
@@ -46,7 +48,7 @@ export function Layout() {
       </main>
       <footer className="border-t border-line py-6 text-center text-sm text-taupe">
         <StoreIcon className="mr-1 inline h-4 w-4" aria-hidden />
-        CampusCart: open-source campus marketplace. Payments happen between you and the seller (pay on pickup).
+        CampusCart: campus store and lending desk. Wallet credits are an on-campus ledger. Pay on pickup is confirmed by the seller.
       </footer>
     </div>
   )

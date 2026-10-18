@@ -4,7 +4,9 @@ from fastapi import APIRouter, HTTPException, Query
 
 from ..deps import CurrentUser, DbDep, SellerUser
 from ..schemas import OrderIn, QuoteIn, StatusIn
+from ..services import notifications
 from ..services import orders as svc
+from ..services.live import push_order
 from ..util import now, out
 
 router = APIRouter(prefix="/api", tags=["orders"])
@@ -78,7 +80,15 @@ async def quote(order_id: str, body: QuoteIn, user: SellerUser, db: DbDep) -> di
     )
     if res.modified_count != 1:
         raise HTTPException(409, "Order was modified concurrently")
-    return out(await db.orders.find_one({"_id": order_id}))
+    updated = await db.orders.find_one({"_id": order_id})
+    assert updated is not None
+    await push_order(updated)
+    await notifications.notify(
+        db, updated["buyer_id"], "order", "Quote ready",
+        f"{updated.get('store_name', 'The store')} quoted {body.total_minor / 100:.2f}",
+        f"/orders/{order_id}", order_id,
+    )
+    return out(updated)
 
 
 @router.post("/orders/{order_id}/confirm-payment")
@@ -89,7 +99,18 @@ async def confirm_payment(order_id: str, user: SellerUser, db: DbDep) -> dict[st
         raise HTTPException(403, "Only the seller can confirm payment")
     if o["status"] in ("rejected", "cancelled"):
         raise HTTPException(409, "Order is closed")
+    if o.get("payment_status") == "wallet_paid":
+        raise HTTPException(409, "This order was already paid from the campus wallet")
     await db.orders.update_one(
-        {"_id": order_id}, {"$set": {"payment_status": "confirmed_by_seller", "updated_at": now()}}
+        {"_id": order_id, "payment_status": {"$ne": "wallet_paid"}},
+        {"$set": {"payment_status": "confirmed_by_seller", "updated_at": now()}},
     )
-    return out(await db.orders.find_one({"_id": order_id}))
+    updated = await db.orders.find_one({"_id": order_id})
+    assert updated is not None
+    await push_order(updated)
+    await notifications.notify(
+        db, updated["buyer_id"], "order", "Payment noted",
+        f"{updated.get('store_name', 'The seller')} confirmed they received payment. This is not a bank check.",
+        f"/orders/{order_id}", order_id,
+    )
+    return out(updated)

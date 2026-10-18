@@ -1,4 +1,4 @@
-import type { Message } from './types'
+import type { AppNotification, Message, Order } from './types'
 
 export type ServerEvent =
   | { type: 'ready'; user_id: string }
@@ -8,6 +8,9 @@ export type ServerEvent =
   | { type: 'read'; conversation_id: string; reader_id: string; up_to_seq: number }
   | { type: 'error'; code: string; client_id?: string }
   | { type: 'pong' }
+  | { type: 'presence'; user_id: string; online: boolean }
+  | { type: 'order'; order: Order }
+  | { type: 'notification'; notification: AppNotification }
 
 export interface SocketLike {
   onopen: (() => void) | null

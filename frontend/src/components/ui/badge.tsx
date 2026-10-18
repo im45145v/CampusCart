@@ -15,6 +15,6 @@ export function Badge({ tone = 'neutral', className, ...p }: HTMLAttributes<HTML
 export function statusTone(status: string): keyof typeof tones {
   if (['completed', 'ready', 'accepted', 'active', 'resolved'].includes(status)) return 'ok'
   if (['rejected', 'cancelled', 'suspended', 'removed'].includes(status)) return 'bad'
-  if (['placed', 'quote_requested', 'quoted', 'preparing', 'open'].includes(status)) return 'warn'
+  if (['placed', 'quote_requested', 'quoted', 'preparing', 'open', 'pending'].includes(status)) return 'warn'
   return 'neutral'
 }

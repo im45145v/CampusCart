@@ -1,9 +1,11 @@
 from pathlib import Path
+from typing import Any
 
 from fastapi import APIRouter, File, HTTPException, UploadFile
 
 from ..config import get_settings
-from ..deps import SellerUser
+from ..deps import CurrentUser, SellerUser
+from ..services.printing import read_pages
 from ..util import new_id
 
 router = APIRouter(prefix="/api", tags=["uploads"])
@@ -38,3 +40,22 @@ async def upload_image(seller: SellerUser, file: UploadFile = File(...)) -> dict
     name = f"{new_id()}{ext}"
     (folder / name).write_bytes(data)
     return {"url": f"/uploads/{name}"}
+
+
+@router.post("/uploads/documents", status_code=201)
+async def upload_document(user: CurrentUser, file: UploadFile = File(...)) -> dict[str, Any]:
+    """Store a print file and report how many pages it contains. The file is not printed here."""
+    del user
+    s = get_settings()
+    data = await file.read(s.max_upload_bytes + 1)
+    if len(data) > s.max_upload_bytes:
+        raise HTTPException(413, "File too large")
+    suffix = ".pdf" if data.startswith(b"%PDF") else detect_ext(data)
+    if suffix not in {".pdf", ".png", ".jpg", ".webp"}:
+        raise HTTPException(415, "Upload a PDF, PNG, JPEG, or WebP")
+    pages, media = read_pages(data, suffix)
+    folder = Path(s.upload_dir)
+    folder.mkdir(parents=True, exist_ok=True)
+    name = f"{new_id()}{suffix}"
+    (folder / name).write_bytes(data)
+    return {"url": f"/uploads/{name}", "pages": pages, "media": media, "bytes": len(data)}

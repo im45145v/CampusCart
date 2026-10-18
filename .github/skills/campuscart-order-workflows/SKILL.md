@@ -15,7 +15,7 @@ When to use
 Procedure
 1. Confirm the affected order statuses among `placed`, `quote_requested`, `quoted`, `accepted`, `preparing`, `ready`, `completed`, `rejected`, and `cancelled`.
 2. Make transition logic changes in `backend/app/services/orders.py`, not ad hoc in controllers or clients.
-3. Preserve atomic stock decrement with conditional `$gte` updates and one-time restoration on cancel or reject.
+3. Preserve atomic stock decrement with conditional `$gte` updates and one-time restoration on cancel or reject. Campus-wallet debits use the same conditional balance check and are refunded once on cancel or reject. Price food extras, print jobs, and voucher discounts on the server; do not trust a client total. Release a voucher redemption once on cancel or reject.
 4. Verify seller and buyer permissions for each action and any notification or chat side effects.
 5. Add backend tests for valid, invalid, and repeated transition attempts.
 

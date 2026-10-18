@@ -48,6 +48,7 @@ async def chat_socket(ws: WebSocket, ticket: str = "") -> None:
     chat.manager.add(user_id, ws)
     await ws.send_json({"type": "ready", "user_id": user_id})
     db = get_db()
+    await chat.announce_presence(db, user_id, True)
     try:
         while True:
             raw = await ws.receive_text()
@@ -66,6 +67,8 @@ async def chat_socket(ws: WebSocket, ticket: str = "") -> None:
         pass
     finally:
         chat.manager.remove(user_id, ws)
+        if user_id and not chat.manager.is_online(user_id):
+            await chat.announce_presence(get_db(), user_id, False)
 
 
 async def _handle(ws: WebSocket, db: Any, user_id: str, frame: dict[str, Any]) -> None:

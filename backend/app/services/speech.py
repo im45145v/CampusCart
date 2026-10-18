@@ -1,3 +1,5 @@
+from typing import Any
+
 import httpx
 
 from ..config import get_settings
@@ -10,11 +12,23 @@ class SpeechUnavailable(Exception):
     pass
 
 
-async def transcribe(data: bytes, content_type: str, filename: str = "audio") -> str:
-    """Speech-to-text via ElevenLabs. Returns transcript text only; nothing is acted upon."""
+async def transcribe(
+    data: bytes, content_type: str, filename: str = "audio", provider: Any = None
+) -> str:
+    """Return transcript text only. Gemma 4 is tried first; ElevenLabs is the fallback."""
     s = get_settings()
+    mime = (content_type or "audio/webm").split(";", 1)[0].strip() or "audio/webm"
+    hear = getattr(provider, "transcribe", None)
+    if hear is not None:
+        try:
+            from .llm import LLMUnavailable
+
+            return str(await hear(data, mime)).strip()
+        except LLMUnavailable as e:
+            if not s.elevenlabs_api_key:
+                raise SpeechUnavailable(str(e)) from e
     if not s.elevenlabs_api_key:
-        raise SpeechUnavailable("ElevenLabs is not configured")
+        raise SpeechUnavailable("Voice transcription is not configured")
     try:
         async with httpx.AsyncClient(timeout=60) as c:
             r = await c.post(

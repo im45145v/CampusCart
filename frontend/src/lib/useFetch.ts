@@ -7,16 +7,16 @@ export function useFetch<T>(path: string | null, params?: Record<string, string 
   const [loading, setLoading] = useState(path !== null)
   const key = path === null ? null : path + JSON.stringify(params ?? {})
 
-  const load = useCallback(async () => {
+  const load = useCallback(async (quiet = false) => {
     if (path === null) return
-    setLoading(true)
-    setError(null)
+    if (!quiet) setLoading(true)
+    if (!quiet) setError(null)
     try {
       setData(await api<T>(path, { params }))
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Something went wrong')
+      if (!quiet) setError(e instanceof Error ? e.message : 'Something went wrong')
     } finally {
-      setLoading(false)
+      if (!quiet) setLoading(false)
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [key])
@@ -25,5 +25,7 @@ export function useFetch<T>(path: string | null, params?: Record<string, string 
     void load()
   }, [load])
 
-  return { data, error, loading, reload: load, setData }
+  const reload = useCallback(() => load(false), [load])
+  const reloadQuiet = useCallback(() => load(true), [load])
+  return { data, error, loading, reload, reloadQuiet, setData }
 }
