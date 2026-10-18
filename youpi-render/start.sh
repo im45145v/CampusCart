@@ -8,6 +8,12 @@ export PAYMENT_API_PORT=6100
 export CHECKOUT_PORTAL_PORT=7000
 export BASE_PAYMENT_API_URL=http://127.0.0.1:6100
 export BASE_CHECKOUT_URL="${RENDER_EXTERNAL_URL:-http://127.0.0.1:${PORT}}"
+host="${BASE_CHECKOUT_URL#https://}"
+host="${host#http://}"
+host="${host%%/*}"
+export DEPLOYMENT_PREFIX="${host%%.*}"
+export CLOUDFLARE_DOMAIN="${host#*.}"
+export YOUPI_MODE=production
 export YOUPI_BIND_HOST=127.0.0.1
 
 node apps/payment-api/src/index.js &
