@@ -82,7 +82,7 @@ export function Layout() {
       <header className="sticky top-0 z-40 bg-forest text-white">
         <div className="mx-auto flex max-w-6xl items-center gap-2 px-4 py-2">
           <Link to="/" className="mr-1 shrink-0 font-heading text-lg font-extrabold tracking-tight text-white">
-            Campus<span className="text-terracotta">Cart</span>
+            Campus<span className="text-gold">Cart</span>
           </Link>
           <SearchForm id="nav-search" q={q} setQ={setQ} className="mx-2 hidden max-w-md flex-1 md:block" />
           <nav aria-label="Main" className="ml-auto hidden items-center gap-1 md:flex">

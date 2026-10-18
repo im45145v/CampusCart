@@ -3,19 +3,19 @@
 @import 'tailwindcss';
 
 /* terracotta / forest / ivory stay so stall themes can override them.
-   Shell defaults: deep teal actions, pine headings, cool paper pages.
-   White on #0E6E62 is about 6.1:1. */
+   Shell defaults: coffee actions, espresso headings, cream desk pages.
+   White on #6F4E37 is about 7.4:1. */
 @theme {
-  --color-ivory: #f3f6f4;
-  --color-card: #ffffff;
-  --color-terracotta: #0e6e62;
-  --color-terracotta-dark: #0a564c;
-  --color-forest: #12312c;
-  --color-ink: #1c2c29;
-  --color-taupe: #5d6d68;
-  --color-line: #d7e3de;
-  --color-mist: #e6f1ec;
-  --color-gold: #d9a441;
+  --color-ivory: #f6f0e6;
+  --color-card: #fffbf6;
+  --color-terracotta: #6f4e37;
+  --color-terracotta-dark: #5c4033;
+  --color-forest: #2c1810;
+  --color-ink: #2c2118;
+  --color-taupe: #7a6556;
+  --color-line: #e7d9c8;
+  --color-mist: #f3e8d8;
+  --color-gold: #c6a15b;
   --color-on-primary: #ffffff;
   --color-ok: #15803d;
   --color-warn: #a16207;

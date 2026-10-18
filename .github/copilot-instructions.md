@@ -43,7 +43,7 @@
 - Preserve rate limiting, audit logging, idempotency, and inventory safety when changing auth, orders, chat, or edge flows.
 
 ## UI and theme
-- Use the CampusCart palette consistently: background `#F3F6F4`, cards `#FFFFFF`, primary teal `#0E6E62`, teal hover `#0A564C`, navigation and headings pine `#12312C`, gold highlight `#D9A441` (small accents only), primary text `#1C2C29`, secondary text `#5D6D68`, borders `#D7E3DE`, success `#15803D`, warning `#A16207`, and error `#B91C1C`. Buttons use white text on the deep teal. Gold is only a highlight behind dark text.
+- Use the CampusCart palette consistently: cream background `#F6F0E6`, cards `#FFFBF6`, coffee buttons `#6F4E37`, coffee hover `#5C4033`, espresso navigation and headings `#2C1810`, brass highlight `#C6A15B` (small accents only), primary text `#2C2118`, secondary text `#7A6556`, borders `#E7D9C8`, success `#15803D`, warning `#A16207`, and error `#B91C1C`. Buttons use white text on the coffee brown. Brass is only a highlight behind dark text.
 - Use Manrope for headings and Inter for body text. A stall theme may recolor that stall’s own pages; the app shell stays on this palette.
 - Prefer accessible, calm marketplace UI patterns that fit Tailwind plus the shadcn-style component system in `frontend/src/components/ui/`.
 

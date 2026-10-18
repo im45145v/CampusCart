@@ -11,7 +11,7 @@ tools: ["read", "search"]
 
 ## Scope
 - Review route structure, page hierarchy, forms, empty states, error states, and seller/buyer action clarity in `frontend/src/`.
-- Preserve theme usage: background `#F3F6F4`, cards `#FFFFFF`, primary teal `#0E6E62`, hover `#0A564C`, pine nav and headings `#12312C`, gold `#D9A441` for small highlights, text `#1C2C29`, secondary `#5D6D68`, borders `#D7E3DE`, Manrope headings, Inter body. Teal buttons use white text. Stall themes may recolor a stall’s own pages.
+- Preserve theme usage: cream background `#F6F0E6`, cards `#FFFBF6`, coffee buttons `#6F4E37`, hover `#5C4033`, espresso nav and headings `#2C1810`, brass `#C6A15B` for small highlights, text `#2C2118`, secondary `#7A6556`, borders `#E7D9C8`, Manrope headings, Inter body. Coffee buttons use white text. Stall themes may recolor a stall’s own pages.
 - Ensure copy reflects true system behavior such as manual payment confirmation, AI drafting only, and ticket-based chat transport.
 
 ## Boundaries

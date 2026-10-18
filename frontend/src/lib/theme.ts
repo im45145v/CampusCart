@@ -8,11 +8,12 @@ export const DEFAULT_ORDER_SETTINGS: OrderSettings = {
 }
 
 export const DEFAULT_THEME: StoreTheme = {
-  primary: '#0E6E62', accent: '#12312C', background: '#F3F6F4', font: 'modern', radius: 'soft',
+  primary: '#6F4E37', accent: '#2C1810', background: '#F6F0E6', font: 'modern', radius: 'soft',
 }
 
 export const THEME_PRESETS: { name: string; theme: StoreTheme }[] = [
-  { name: 'Campus teal', theme: DEFAULT_THEME },
+  { name: 'Desk coffee', theme: DEFAULT_THEME },
+  { name: 'Campus teal', theme: { primary: '#0E6E62', accent: '#12312C', background: '#F3F6F4', font: 'modern', radius: 'soft' } },
   { name: 'Warm clay', theme: { primary: '#C65D3A', accent: '#263D32', background: '#F7F4ED', font: 'modern', radius: 'soft' } },
   { name: 'Coffee house', theme: { primary: '#8B5A2B', accent: '#3E2A1C', background: '#F5EEE4', font: 'serif', radius: 'soft' } },
   { name: 'Fresh mint', theme: { primary: '#1F9D78', accent: '#0F3D3E', background: '#EEF8F4', font: 'rounded', radius: 'pill' } },
@@ -58,7 +59,7 @@ export function contrast(a: string, b: string): number {
 export function themeStyle(theme: StoreTheme | undefined): CSSProperties {
   const t = { ...DEFAULT_THEME, ...theme }
   const [lg, xl, xxl] = RADII[t.radius]
-  const onPrimary = contrast('#ffffff', t.primary) >= contrast('#12312C', t.primary) ? '#ffffff' : '#12312C'
+  const onPrimary = contrast('#ffffff', t.primary) >= contrast('#2C1810', t.primary) ? '#ffffff' : '#2C1810'
   return {
     '--color-terracotta': t.primary,
     '--color-terracotta-dark': shade(t.primary, -0.18),
