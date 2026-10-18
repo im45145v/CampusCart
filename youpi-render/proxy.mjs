@@ -1,3 +1,4 @@
+import fs from 'node:fs'
 import http from 'node:http'
 
 const port = Number(process.env.PORT || 10000)
@@ -29,6 +30,34 @@ async function observerHealth(_req, res) {
   res.end(JSON.stringify({ observers }))
 }
 
+async function startGmailConnect(_req, res) {
+  let token = ''
+  try {
+    token = fs.readFileSync('/opt/youpi/data/.secrets/observer_api_token', 'utf8').trim()
+  } catch {
+    res.writeHead(503, { 'content-type': 'text/plain' })
+    res.end('Gmail connect is not ready')
+    return
+  }
+  try {
+    const response = await fetch(`http://127.0.0.1:${gmailPort}/oauth/url`, {
+      headers: { authorization: `Bearer ${token}` },
+    })
+    const body = await response.json()
+    const authUrl = new URL(String(body.authUrl || ''))
+    if (!response.ok || authUrl.origin !== 'https://accounts.google.com') {
+      res.writeHead(502, { 'content-type': 'text/plain' })
+      res.end('Gmail connect did not start')
+      return
+    }
+    res.writeHead(302, { location: authUrl.href })
+    res.end()
+  } catch {
+    if (!res.headersSent) res.writeHead(502, { 'content-type': 'text/plain' })
+    res.end('Gmail connect did not start')
+  }
+}
+
 const server = http.createServer((req, res) => {
   const path = (req.url || '/').split('?')[0]
   if (req.method === 'GET' && (path === '/' || path === '/health')) {
@@ -38,6 +67,10 @@ const server = http.createServer((req, res) => {
   }
   if (req.method === 'GET' && path === '/health/observers') {
     void observerHealth(req, res)
+    return
+  }
+  if (req.method === 'GET' && path === '/oauth/connect') {
+    void startGmailConnect(req, res)
     return
   }
   if (blocked.some((rule) => rule.test(path))) {
