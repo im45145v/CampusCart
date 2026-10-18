@@ -19,6 +19,16 @@ export GMAIL_OBSERVER_PORT="${GMAIL_OBSERVER_PORT:-6003}"
 export SMS_OBSERVER_PORT="${SMS_OBSERVER_PORT:-6002}"
 export GMAIL_REDIRECT_URI="${GMAIL_REDIRECT_URI:-${BASE_CHECKOUT_URL}/oauth/callback}"
 
+secret_dir=/opt/youpi/data/.secrets
+mkdir -p "$secret_dir"
+token_file="$secret_dir/observer_api_token"
+if [ ! -s "$token_file" ]; then
+  node -e "process.stdout.write(require('node:crypto').randomBytes(32).toString('hex'))" > "$token_file"
+  chmod 600 "$token_file"
+fi
+OBSERVER_API_TOKEN="$(cat "$token_file")"
+export OBSERVER_API_TOKEN
+
 node /opt/render/patch-health.mjs
 
 node apps/payment-api/src/index.js &

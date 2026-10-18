@@ -30,11 +30,27 @@ async function observerHealth(_req, res) {
   res.end(JSON.stringify({ observers }))
 }
 
+function observerToken() {
+  const fromEnv = (process.env.OBSERVER_API_TOKEN || '').trim()
+  if (fromEnv) return fromEnv
+  const paths = [
+    '/opt/youpi/data/.secrets/observer_api_token',
+    '/opt/youpi/node_modules/data/.secrets/observer_api_token',
+  ]
+  for (const path of paths) {
+    try {
+      const value = fs.readFileSync(path, 'utf8').trim()
+      if (value) return value
+    } catch {
+      // The next location may hold the token.
+    }
+  }
+  return ''
+}
+
 async function startGmailConnect(_req, res) {
-  let token = ''
-  try {
-    token = fs.readFileSync('/opt/youpi/data/.secrets/observer_api_token', 'utf8').trim()
-  } catch {
+  const token = observerToken()
+  if (!token) {
     res.writeHead(503, { 'content-type': 'text/plain' })
     res.end('Gmail connect is not ready')
     return
