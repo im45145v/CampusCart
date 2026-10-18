@@ -142,7 +142,13 @@ async def start_youpi_checkout(db: Database, user_id: str, amount: int) -> dict[
         "amount_minor": amount, "created_at": {"$gte": fresh}, "checkout_url": {"$type": "string"},
     })
     if open_row:
-        return open_row
+        alive = await youpi.session_open(str(open_row.get("youpi_payment_id") or ""))
+        if alive is True or alive is None:
+            return open_row
+        await db.wallet_ledger.update_one(
+            {"_id": open_row["_id"], "status": "requested"},
+            {"$set": {"status": "expired"}, "$unset": {"transaction_key": ""}},
+        )
     balance = await balance_of(db, user_id)
     entry = _entry(
         user_id, amount, "credit", "topup", balance, method="youpi", status="requested",

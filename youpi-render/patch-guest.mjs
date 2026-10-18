@@ -61,6 +61,26 @@ mustReplace(
 )
 
 mustReplace(
+  htmlPath,
+  `        if (!res.ok) {
+          dismissSplashScreen();
+          return;
+        }`,
+  `        if (!res.ok) {
+          const body = document.querySelector('.ypg-body');
+          if (body && !document.getElementById('missingCheckout')) {
+            const note = document.createElement('div');
+            note.id = 'missingCheckout';
+            note.style.cssText = 'padding:28px 8px;text-align:center;';
+            note.innerHTML = '<h2 style="font-size:22px;font-weight:800;margin:0 0 8px;">This payment page expired</h2><p style="color:#64748b;margin:0 0 16px;">Go back to UniCart and start the payment again.</p><a href="https://campuscart-web-h46s.onrender.com/account" style="display:inline-block;background:#0b63e5;color:#fff;font-weight:700;padding:12px 18px;border-radius:10px;text-decoration:none;">Back to wallet</a>';
+            body.prepend(note);
+          }
+          dismissSplashScreen();
+          return;
+        }`,
+)
+
+mustReplace(
   routesPath,
   'if (session.status === PaymentStatus.ACTIVE && payeeVpa) {',
   'if ((session.status === PaymentStatus.ACTIVE || session.status === PaymentStatus.INITIATED) && payeeVpa) {',

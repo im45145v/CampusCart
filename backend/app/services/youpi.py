@@ -122,6 +122,25 @@ async def create_payment(order_id: str, amount_minor: int, return_url: str) -> d
     return {"paymentId": payment_id, "checkoutUrl": checkout_url}
 
 
+async def session_open(payment_id: str) -> bool | None:
+    """True when YouPI still has this checkout, False when it is gone, None when YouPI did not answer."""
+    if not payment_id:
+        return False
+    try:
+        async with httpx.AsyncClient(timeout=20) as client:
+            response = await client.get(
+                f"{_api_root()}/api/v1/payments/{quote(payment_id, safe='')}",
+                headers={"X-Merchant-Key": get_settings().youpi_webhook_secret},
+            )
+    except httpx.HTTPError:
+        return None
+    if response.status_code == 404:
+        return False
+    if response.status_code >= 400:
+        return None
+    return True
+
+
 async def fetch_payment(payment_id: str) -> dict[str, Any]:
     """Re-read a payment with the merchant key. The callback body is not this record."""
     try:

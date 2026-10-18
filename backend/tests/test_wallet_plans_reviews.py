@@ -162,6 +162,36 @@ async def test_youpi_callback_credits_once(
     assert (await client.get("/api/me/wallet", headers=buyer.headers)).json()["balance_minor"] == 20_00
 
 
+async def test_youpi_checkout_replaces_a_session_youpi_no_longer_has(
+    client: httpx.AsyncClient, buyer: Actor, monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    _enable_youpi(monkeypatch)
+    created: list[str] = []
+
+    async def fake_create(order_id: str, amount_minor: int, return_url: str) -> dict[str, str]:
+        del amount_minor, return_url
+        created.append(order_id)
+        return {"paymentId": f"pay-{order_id}", "checkoutUrl": f"http://youpi.test/checkout/{order_id}"}
+
+    async def fake_open(payment_id: str) -> bool:
+        del payment_id
+        return False
+
+    monkeypatch.setattr(youpi, "create_payment", fake_create)
+    monkeypatch.setattr(youpi, "session_open", fake_open)
+    first = await client.post(
+        "/api/me/wallet/checkout", headers=buyer.headers, json={"amount_minor": 15_00},
+    )
+    assert first.status_code == 201, first.text
+    second = await client.post(
+        "/api/me/wallet/checkout", headers=buyer.headers, json={"amount_minor": 15_00},
+    )
+    assert second.status_code == 201, second.text
+    assert second.json()["id"] != first.json()["id"]
+    assert second.json()["checkout_url"] == f"http://youpi.test/checkout/{second.json()['id']}"
+    assert len(created) == 2
+
+
 async def test_youpi_rejects_a_signed_callback_the_gateway_does_not_confirm(
     client: httpx.AsyncClient, buyer: Actor, monkeypatch: pytest.MonkeyPatch,
 ) -> None:
