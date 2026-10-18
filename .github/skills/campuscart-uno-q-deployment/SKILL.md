@@ -1,11 +1,11 @@
 ---
 name: campuscart-uno-q-deployment
-description: Guides deployment and operations for CampusCart UNO Q. Use when changing edge rollout, secrets, Telegram setup, or MCP exposure.
+description: Guides deployment and operations for UniCart UNO Q. Use when changing edge rollout, secrets, Telegram setup, or MCP exposure.
 ---
 # campuscart-uno-q-deployment
 
 Purpose
-- Prepare CampusCart UNO Q and edge-related changes for safe deployment and operations.
+- Prepare UniCart UNO Q and edge-related changes for safe deployment and operations.
 - Keep optional Telegram and MCP capabilities explicit and controlled.
 
 When to use

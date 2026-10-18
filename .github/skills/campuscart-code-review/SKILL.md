@@ -1,11 +1,11 @@
 ---
 name: campuscart-code-review
-description: Guides high-signal CampusCart diff review. Use when checking a change for bugs, regressions, and repo-specific invariant violations.
+description: Guides high-signal UniCart diff review. Use when checking a change for bugs, regressions, and repo-specific invariant violations.
 ---
 # campuscart-code-review
 
 Purpose
-- Review CampusCart diffs for correctness, regression risk, and architecture fit.
+- Review UniCart diffs for correctness, regression risk, and architecture fit.
 - Focus on real defects, not style churn.
 
 When to use
@@ -14,7 +14,7 @@ When to use
 
 Procedure
 1. Read the diff and identify touched surfaces: backend, frontend, edge, CI, deployment, or docs.
-2. Check CampusCart-specific invariants: minor-unit money, server-computed totals, order state transitions, single-use 60s chat tickets, persisted-before-ack messages, grounded AI drafts, and seller-scoped edge access.
+2. Check UniCart-specific invariants: minor-unit money, server-computed totals, order state transitions, single-use 60s chat tickets, persisted-before-ack messages, grounded AI drafts, and seller-scoped edge access.
 3. Verify tests and docs were updated when behavior changed.
 4. Separate confirmed bugs from softer suggestions.
 5. Point the author to the right owning agent or skill if follow-up work is needed.

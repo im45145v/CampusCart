@@ -1,11 +1,11 @@
 ---
 name: campuscart-debugging
-description: Guides CampusCart debugging and root-cause isolation. Use when a regression or failing flow must be reproduced and narrowed down.
+description: Guides UniCart debugging and root-cause isolation. Use when a regression or failing flow must be reproduced and narrowed down.
 ---
 # campuscart-debugging
 
 Purpose
-- Diagnose CampusCart regressions quickly and hand off a precise fix path.
+- Diagnose UniCart regressions quickly and hand off a precise fix path.
 - Separate symptom, reproduction, root cause, and verification clearly.
 
 When to use

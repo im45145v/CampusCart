@@ -75,7 +75,7 @@ export default function AuthPage() {
 
   return (
     <div className="mx-auto max-w-md space-y-4 pt-2">
-      <p className="text-center font-heading text-lg font-extrabold tracking-tight">Campus<span className="text-terracotta">Cart</span></p>
+      <p className="text-center font-heading text-lg font-extrabold tracking-tight">Uni<span className="text-terracotta">Cart</span></p>
       <Card className="space-y-4">
       <div>
         <h1 className="text-2xl font-extrabold">Sign in</h1>

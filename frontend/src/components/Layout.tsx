@@ -82,7 +82,7 @@ export function Layout() {
       <header className="sticky top-0 z-40 bg-forest text-white">
         <div className="mx-auto flex max-w-6xl items-center gap-2 px-4 py-2">
           <Link to="/" className="mr-1 shrink-0 font-heading text-lg font-extrabold tracking-tight text-white">
-            Campus<span className="text-gold">Cart</span>
+            Uni<span className="text-gold">Cart</span>
           </Link>
           <SearchForm id="nav-search" q={q} setQ={setQ} className="mx-2 hidden max-w-md flex-1 md:block" />
           <nav aria-label="Main" className="ml-auto hidden items-center gap-1 md:flex">
@@ -133,7 +133,7 @@ export function Layout() {
       </main>
       <footer className="mt-4 border-t border-line bg-card">
         <div className="mx-auto flex max-w-6xl flex-col gap-3 px-4 py-8 text-sm sm:flex-row sm:items-center sm:justify-between">
-          <p><span className="font-semibold text-ink">CampusCart</span> <span className="text-taupe">· Student stalls, print jobs, and gear you can borrow.</span></p>
+          <p><span className="font-semibold text-ink">UniCart</span> <span className="text-taupe">· Student stalls, print jobs, and gear you can borrow.</span></p>
           <nav aria-label="Footer" className="flex flex-wrap gap-x-4 gap-y-1">
             <Link className="inline-flex min-h-11 items-center text-taupe underline-offset-2 hover:text-ink hover:underline" to="/help">Help</Link>
             <Link className="inline-flex min-h-11 items-center text-taupe underline-offset-2 hover:text-ink hover:underline" to="/payments">Payments</Link>

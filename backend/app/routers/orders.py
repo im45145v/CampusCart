@@ -93,7 +93,7 @@ async def quote(order_id: str, body: QuoteIn, user: SellerUser, db: DbDep) -> di
 
 @router.post("/orders/{order_id}/confirm-payment")
 async def confirm_payment(order_id: str, user: SellerUser, db: DbDep) -> dict[str, Any]:
-    """Seller manually confirms they received payment. CampusCart does not verify payments."""
+    """Seller manually confirms they received payment. UniCart does not verify payments."""
     o, role = await _load(db, order_id, user)
     if role != "seller":
         raise HTTPException(403, "Only the seller can confirm payment")

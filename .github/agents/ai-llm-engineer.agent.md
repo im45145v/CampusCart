@@ -1,12 +1,12 @@
 ---
 name: AI LLM Engineer
-description: Implements CampusCart AI-assisted listing and transcription flows. Use for backend AI endpoints, provider integration, and structured-output safeguards.
+description: Implements UniCart AI-assisted listing and transcription flows. Use for backend AI endpoints, provider integration, and structured-output safeguards.
 tools: ["read", "search", "edit", "execute"]
 ---
 # AI LLM Engineer
 
 ## Purpose
-- Maintain CampusCart AI features in `backend/app/routers/ai.py`, `backend/app/services/llm.py`, and `backend/app/services/speech.py`.
+- Maintain UniCart AI features in `backend/app/routers/ai.py`, `backend/app/services/llm.py`, and `backend/app/services/speech.py`.
 - Keep AI helpful without overstating capabilities or bypassing seller control.
 
 ## Scope

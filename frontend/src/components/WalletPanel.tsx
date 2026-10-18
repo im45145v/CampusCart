@@ -108,7 +108,7 @@ function MoneyForm({
         <div className="space-y-2 rounded-xl border border-line bg-ivory px-3 py-3 text-sm">
           <p>Pay this campus desk UPI from your own app, then paste the transaction ID here.</p>
           <p className="font-mono text-base font-semibold text-forest">{upiId || 'UPI ID unavailable'}</p>
-          <p className="text-taupe">CampusCart does not check UPI or a bank. The ID you type is not proof of payment. An admin confirms the top-up before the credits can be spent.</p>
+          <p className="text-taupe">UniCart does not check UPI or a bank. The ID you type is not proof of payment. An admin confirms the top-up before the credits can be spent.</p>
           {upiId && (
             <Button type="button" size="sm" variant="secondary" onClick={() => void copyUpi()}>
               {copied ? 'Copied' : 'Copy UPI ID'}
@@ -126,7 +126,7 @@ function MoneyForm({
             <Input required type="number" min={10} max={kind === 'add' ? 2000 : undefined} step="0.01" value={amount} onChange={(e) => setAmount(e.target.value)} />
           </Field>
           {kind === 'add' && (
-            <Field label="UPI transaction ID" hint="Required. This is the reference from your UPI app, not a receipt CampusCart can verify.">
+            <Field label="UPI transaction ID" hint="Required. This is the reference from your UPI app, not a receipt UniCart can verify.">
               <Input required minLength={4} maxLength={64} autoComplete="off" value={transactionId} onChange={(e) => setTransactionId(e.target.value)} placeholder="For example 123456789012" />
             </Field>
           )}

@@ -1,6 +1,6 @@
 """Promo codes. The server decides the discount; the client never sends an amount.
 
-A code reduces what the student pays and what the store receives. CampusCart does not
+A code reduces what the student pays and what the store receives. UniCart does not
 reimburse the difference. Cancel or reject releases the redemption so a limited code,
 including a first-order code, can be used again.
 """

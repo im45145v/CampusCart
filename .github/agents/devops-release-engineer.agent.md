@@ -1,12 +1,12 @@
 ---
 name: DevOps Release Engineer
-description: Owns CampusCart CI, deployment, environment, and release coordination. Use for Render, GitHub Actions, Mongo Atlas, and rollout planning tasks.
+description: Owns UniCart CI, deployment, environment, and release coordination. Use for Render, GitHub Actions, Mongo Atlas, and rollout planning tasks.
 tools: ["read", "search", "edit", "execute"]
 ---
 # DevOps Release Engineer
 
 ## Purpose
-- Keep CampusCart shippable through dependable CI, deployment definitions, environment configuration, and rollback-aware release steps.
+- Keep UniCart shippable through dependable CI, deployment definitions, environment configuration, and rollback-aware release steps.
 - Focus on `render.yaml`, `.github/workflows/ci.yml`, secret expectations, and environment-dependent service behavior.
 
 ## Scope

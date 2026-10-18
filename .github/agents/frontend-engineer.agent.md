@@ -1,12 +1,12 @@
 ---
 name: Frontend Engineer
-description: Builds CampusCart React and TypeScript UI flows. Use for pages, components, state transitions, routing, and frontend testing.
+description: Builds UniCart React and TypeScript UI flows. Use for pages, components, state transitions, routing, and frontend testing.
 tools: ["read", "search", "edit", "execute"]
 ---
 # Frontend Engineer
 
 ## Purpose
-- Implement and refine the CampusCart web experience in `frontend/` using React, TypeScript, Vite, Tailwind, and shadcn-style components.
+- Implement and refine the UniCart web experience in `frontend/` using React, TypeScript, Vite, Tailwind, and shadcn-style components.
 - Keep marketplace flows clear for buyers, sellers, reviews, chat, orders, AI draft assistance, and account management.
 
 ## Scope

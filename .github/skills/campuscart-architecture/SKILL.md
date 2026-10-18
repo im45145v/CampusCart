@@ -1,11 +1,11 @@
 ---
 name: campuscart-architecture
-description: Defines CampusCart system boundaries and design decisions. Use when work spans backend, frontend, edge, or deployment concerns.
+description: Defines UniCart system boundaries and design decisions. Use when work spans backend, frontend, edge, or deployment concerns.
 ---
 # campuscart-architecture
 
 Purpose
-- Evaluate CampusCart architecture decisions before implementation so responsibilities stay in the correct layer.
+- Evaluate UniCart architecture decisions before implementation so responsibilities stay in the correct layer.
 - Protect clear boundaries among FastAPI backend, React frontend, and `edge/uno_q/` seller assistant tooling.
 
 When to use

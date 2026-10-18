@@ -1,6 +1,6 @@
-# Using CampusCart
+# Using UniCart
 
-CampusCart is one campus board. Students order from stalls, and students run those stalls. This page is the buyer and seller guide. Payment rules that the software actually enforces are in [architecture.md](architecture.md) and on the site under Payments and Terms.
+UniCart is one campus board. Students order from stalls, and students run those stalls. This page is the buyer and seller guide. Payment rules that the software actually enforces are in [architecture.md](architecture.md) and on the site under Payments and Terms.
 
 ## Buyer
 
@@ -21,12 +21,12 @@ Campus credits are a ledger on this campus. To add funds, pay the desk UPI shown
 
 ## What this board does not do
 
-These ideas show up on other marketplaces. They are not part of CampusCart, and the docs should not describe them as if they were.
+These ideas show up on other marketplaces. They are not part of UniCart, and the docs should not describe them as if they were.
 
 - Paid featured placements, promotion fees, or a featured listing that expires and must be bought again.
 - A commission on the order. Completing a wallet-paid order credits the seller the amount charged.
 - Buying or selling social accounts, email accounts, or login details, and any automatic delivery of those credentials.
-- Crypto, or automated UPI or bank verification. The desk UPI is only an address to pay. Cash at the stall is confirmed by the seller. CampusCart does not check either one.
+- Crypto, or automated UPI or bank verification. The desk UPI is only an address to pay. Cash at the stall is confirmed by the seller. UniCart does not check either one.
 - A second campus, a waitlist for other institutes, or a rule that only a `.ac.in` address can register. Accounts here use the email the student registers.
 - A wanted-request board. Ask the stall from the listing, or open your own stall.
-- A deposit held by CampusCart for a borrow. The fee is the rate on the listing. Any cash deposit is between the two students.
+- A deposit held by UniCart for a borrow. The fee is the rate on the listing. Any cash deposit is between the two students.

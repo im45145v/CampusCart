@@ -1,11 +1,11 @@
 ---
 name: campuscart-auth-and-rbac
-description: Guides CampusCart authentication and authorization changes. Use when touching JWTs, role checks, protected routes, or scoped tokens.
+description: Guides UniCart authentication and authorization changes. Use when touching JWTs, role checks, protected routes, or scoped tokens.
 ---
 # campuscart-auth-and-rbac
 
 Purpose
-- Change or review CampusCart authentication, authorization, and token-scoped access safely.
+- Change or review UniCart authentication, authorization, and token-scoped access safely.
 - Keep role checks and trust boundaries centralized in backend dependencies.
 
 When to use
