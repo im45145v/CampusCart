@@ -1,6 +1,5 @@
 import type { ReactNode } from 'react'
 import { Link } from 'react-router-dom'
-import { useFetch } from '@/lib/useFetch'
 
 function Page({ title, children }: { title: string; children: ReactNode }) {
   return (
@@ -25,7 +24,7 @@ export function TermsPage() {
       <h2 className="text-base font-bold">Borrowing</h2>
       <p>A borrow fee is the seller’s rate for each day or each hour, up to the longest borrow on that listing. It is not a purchase, and UniCart does not hold a deposit. Return the item by the date you gave, in the condition you agreed. If the stall is pay upfront, that fee is campus credits. A cancel or rejection returns them. Once the owner marks the item back, the order is completed and the fee stays with them.</p>
       <h2 className="text-base font-bold">Payment</h2>
-      <p>Each stall chooses how it is paid. Campus wallet credits are an on-campus ledger. To add credits you pay the desk UPI yourself and type the transaction ID. That ID is not proof of payment. An admin confirms the top-up before the credits can be spent. A payout leaves your spendable balance when you request it, until staff mark it paid or return it. UniCart does not verify a bank or UPI payment.</p>
+      <p>Each stall chooses how it is paid. Campus wallet credits are an on-campus ledger. To add credits you choose an amount and pay in the YouPI checkout from your own UPI app. The credits stay unspendable until UniCart verifies YouPI’s signed confirmation. Closing the payment page does not add them. A payout leaves your spendable balance when you request it, until staff mark it paid or return it. UniCart does not read your bank itself.</p>
       <p>A stall marked pay upfront accepts only campus credits. The credits leave your balance when the price is known: when you place a priced order, or when you accept a quote. That stall does not take cash when you collect. Pay on pickup means you pay the seller in person, and UniCart does not hold that cash. Pay the seller directly means they confirm they received it. UniCart does not check either of those against a bank.</p>
       <p>A cancelled or rejected order returns campus credits once. A completed order does not. Plans and promo codes use the same ledger. A code lowers what you pay, and the stall receives that amount. Plans do not renew by themselves. Cancelling a plan stops the next period, and the credits already paid for the current period stay with the stall.</p>
       <h2 className="text-base font-bold">Listings</h2>
@@ -46,7 +45,7 @@ export function PrivacyPage() {
         <li>Your name and email. A sign-in code is kept only as a hash until it expires. Password accounts also store a bcrypt hash.</li>
         <li>Orders, pickup slots, checkout answers, reviews, and messages.</li>
         <li>Stall details, listings, photos, and print files you upload.</li>
-        <li>The campus wallet ledger: top-up requests and the transaction ID you typed, payouts, refunds, and the note you wrote.</li>
+        <li>The campus wallet ledger: top-up checkouts, the YouPI payment id, payouts, refunds, and the note you wrote.</li>
       </ul>
       <h2 className="text-base font-bold">Who can see it</h2>
       <p>The other person on an order or a chat can see that thread. A seller sees orders for their stall. Campus desk staff can see reports, stall applications, and wallet entries they need to mark paid. Print files are for that order.</p>
@@ -57,14 +56,12 @@ export function PrivacyPage() {
 }
 
 export function PaymentsPage() {
-  const desk = useFetch<{ upi_id: string }>('/api/payments/desk')
-  const upi = desk.data?.upi_id
   return (
     <Page title="Payments">
       <p>A stall is paid in campus credits, or in cash the seller confirms in person. The stall page says which.</p>
       <h2 className="text-base font-bold">Campus wallet</h2>
-      <p>Credits pay for orders and stall plans. Add between ₹10 and ₹2,000 at a time, up to ₹5,000 a day. Pay the campus desk UPI {upi ? <span className="font-mono font-semibold text-forest">{upi}</span> : 'shown on your wallet'} from your own UPI app, then enter that transaction ID. UniCart does not check the payment. An admin has to confirm the top-up before those credits can be spent. The ID you type is not proof that the money arrived.</p>
-      <p>A payout request of at least ₹10 leaves your spendable balance until staff mark it paid or return it. You can have one payout waiting at a time. Buyer credits and seller earnings share one balance. Nothing in this ledger is a bank transfer, and nothing here is an automated UPI confirmation.</p>
+      <p>Credits pay for orders and stall plans. Add between ₹10 and ₹2,000 at a time, up to ₹5,000 a day. The wallet opens a YouPI checkout with a QR and UPI app links. Pay from your own UPI app. UniCart adds the credits only after it verifies YouPI’s signed confirmation and re-reads that payment. The payment page itself cannot mark the top-up successful.</p>
+      <p>A payout request of at least ₹10 leaves your spendable balance until staff mark it paid or return it. You can have one payout waiting at a time. Buyer credits and seller earnings share one balance. The ledger is not a bank transfer. UniCart does not read the bank; it accepts the top-up when YouPI’s signed UPI confirmation matches the checkout it opened.</p>
       <h2 className="text-base font-bold">Pay upfront</h2>
       <p>Some stalls accept only campus credits. Tanuj Prints and Potato’s Makerspace are set up that way: the desk prints the file, or hands over the gear, after the credits are taken. The stall card says Pay upfront. Cash at collection is not offered. The credits are taken when you place a priced order. A print job that still needs a quote is charged when you accept the quote.</p>
       <h2 className="text-base font-bold">Cash at the stall</h2>

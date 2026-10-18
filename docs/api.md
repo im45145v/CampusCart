@@ -12,7 +12,7 @@ routers in `backend/app/routers/` are the source of truth.
 | Products | `GET /products` (q, category, store, price, availability), `POST /stores/{id}/products` (draft), `GET/PATCH /products/{id}`, `POST /products/{id}/publish`, `/unpublish` |
 | Orders | `POST /orders`, `GET /orders`, `GET /seller/orders`, `GET /orders/{id}`, `POST /orders/{id}/status`, `/quote`, `/confirm-payment`, `/review`, `GET /orders/{id}/review`, `POST /products/{id}/print-preview` |
 | Notifications | `GET /me/notifications`, `POST /me/notifications/read` |
-| Wallet | `GET /payments/desk` (public UPI id only), `GET /me/wallet`, `POST /me/wallet/add`, `POST /me/wallet/remove`. Admin: `GET /admin/wallet`, `POST /admin/wallet/{id}/approve`, `/reject`, `/paid`, `/return`, `/reverse` |
+| Wallet | `GET /payments/desk` (provider only), `GET /me/wallet`, `POST /me/wallet/checkout`, `POST /payments/youpi` (signed callback), `POST /me/wallet/remove`. `POST /me/wallet/add` is retired (410). Admin: `GET /admin/wallet`, `POST /admin/wallet/{id}/paid`, `/return`, `/reverse`. `/approve` does not credit a YouPI top-up |
 | Plans | `GET/POST /stores/{id}/plans`, `PATCH /plans/{id}`, `POST /plans/{id}/subscribe`, `GET /me/subscriptions`, `POST /subscriptions/{id}/renew`, `/cancel`, `GET /stores/{id}/subscribers` |
 | Vouchers | `GET /stores/{id}/vouchers`, `POST /stores/{id}/vouchers`, `PATCH /vouchers/{id}` (`active`), `POST /vouchers/preview`, admin `GET/POST /admin/vouchers` |
 | Account | saved stores under `/me/saved-stores`, `GET /seller/summary`, `GET /seller/charts`, API tokens under `/seller/api-tokens` |
@@ -45,8 +45,8 @@ A product may set `featured: true`. The server allows three featured listings pe
 `payment_options` is chosen by the stall and rejected if the order uses another method. `campus_wallet` debits the buyer's campus-wallet balance when the
 catalogue total is known, or when the buyer accepts a quote. A stall that lists only `campus_wallet` is pay upfront: cash at collection is not offered. Cancel and reject credit the debit back once, including after the seller has accepted the order. Completing the
 order credits the seller the same amount. `POST /orders/{id}/confirm-payment` rejects a wallet-paid order.
-`GET /payments/desk` returns `{upi_id}` from `ADMIN_UPI_ID` (default `im45145v@oksbi`) and no other settings.
-`POST /me/wallet/add` requires `transaction_id` and records a requested top-up (₹10–₹2,000, ₹5,000 per UTC day, counting requested and posted rows). The spendable balance does not change. Repeating the same ID returns that row and does not credit twice. An admin `POST /admin/wallet/{id}/approve` posts it and credits once; `/reject` declines it with no credit. `/reverse` still debits a posted top-up. None of this verifies UPI.
+`GET /payments/desk` returns `{provider: "youpi", checkout: "ready"|"unavailable"}` and no keys.
+`POST /me/wallet/checkout` with `{amount_minor}` opens a YouPI checkout (₹10–₹2,000, ₹5,000 per UTC day, counting open and posted rows). The response includes `checkout_url`. The spendable balance does not change. The same amount within 20 minutes returns the open checkout. `POST /payments/youpi` is YouPI's server callback. The signature is HMAC-SHA256 of the raw body, header `X-Gateway-Signature: sha256=<hex>`. A valid signature for a UPI success is then checked against `GET /api/v1/payments/{id}` on YouPI. Only that re-read, with a verification tag such as Single Verification or Dual Verification, posts the top-up once. Repeating the callback does not credit twice. Cash-on-delivery and a body that does not match YouPI's record return `{credited: false}`. `/reverse` still debits a posted top-up.
 `POST /me/wallet/remove` debits a payout request. A second request is rejected while one is still `requested`. Staff later mark it paid or return it.
 
 An active store plan discounts catalogue orders by `discount_percent` (server-side, before the wallet debit).

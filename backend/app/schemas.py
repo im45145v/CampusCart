@@ -368,18 +368,8 @@ class FundsIn(Strict):
     note: str = Field(default="", max_length=200)
 
 
-TxnId = Annotated[
-    str,
-    StringConstraints(
-        strip_whitespace=True, min_length=4, max_length=64,
-        pattern=r"^[A-Za-z0-9][A-Za-z0-9._:-]*$",
-    ),
-]
-
-
-class AddFundsIn(FundsIn):
-    method: Literal["campus_desk", "reference", "upi"] = "upi"
-    transaction_id: TxnId
+class CheckoutIn(Strict):
+    amount_minor: int = Field(ge=1, le=100_000_00)
 
 
 class PlanIn(Strict):

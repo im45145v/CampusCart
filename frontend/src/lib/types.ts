@@ -102,7 +102,15 @@ export interface WalletEntry {
   note: string; method: string | null; status: string; balance_after_minor: number
   related_id: string | null; created_at: string; transaction_id?: string | null
 }
-export interface Wallet { balance_minor: number; upi_id: string; entries: WalletEntry[] }
+export interface Wallet {
+  balance_minor: number
+  checkout: 'ready' | 'unavailable'
+  entries: WalletEntry[]
+}
+export interface WalletCheckout extends WalletEntry {
+  checkout_url?: string | null
+  youpi_payment_id?: string | null
+}
 export interface Plan {
   id: string; store_id: string; title: string; description: string; price_minor: number
   period: 'week' | 'month'; discount_percent: number; active: boolean; store_name?: string

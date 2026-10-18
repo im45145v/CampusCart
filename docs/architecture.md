@@ -23,10 +23,11 @@ UNO Q service (edge/uno_q) --read-only API token--> /api/edge/*
   Printing orders start as `quote_requested`; the seller sends a manual quote and the buyer approves it.
   Payment is whatever that stall enabled: pay on pickup, paid directly to the seller (seller confirms), or campus-wallet credits.
   A stall whose only method is campus wallet is pay upfront. The debit runs when the catalogue total is known, or when the buyer accepts a quote.
-  Campus wallet is an on-campus ledger in `wallet_ledger`. A top-up stores the transaction ID the student typed
-  and stays `requested` until an admin approves it; only then does the spendable balance increase. The ID is not
-  proof of payment. Staff can reverse a posted top-up. Payouts leave the balance when requested; the desk marks
-  them paid or returns them. No UPI or bank payment is verified. Wallet charges are atomic
+  Campus wallet is an on-campus ledger in `wallet_ledger`. A top-up opens a YouPI-PG checkout and stays
+  `requested` until the signed callback is verified and YouPI's payment record is a verified UPI success.
+  A browser success flag does not credit the wallet. Staff can reverse a posted top-up. Payouts leave the
+  balance when requested; the desk marks them paid or returns them. UniCart does not read the bank itself.
+  Wallet charges are atomic
   (`balance >= amount`). Catalogue orders from an active store plan are discounted on the server; quote orders are not.
   Completing a wallet-paid order credits the seller the charged amount (no platform fee). Cancel or reject refunds it once, including a cancel after the seller has accepted.
 - **Plans:** sellers publish up to six memberships (`plans`). Subscribing or renewing debits the campus wallet.

@@ -50,13 +50,19 @@ class Settings(BaseSettings):
     otp_ttl_minutes: int = 10
     otp_max_attempts: int = 5
 
-    # Shown on the add-funds form. Public payment address, not a secret.
-    # A typed UPI reference is not proof; an admin still has to approve the top-up.
+    # Kept so an older deploy still boots. New top-ups do not show this address.
     admin_upi_id: str = "im45145v@oksbi"
+
+    # YouPI-PG. All three must be set before a student can open a checkout.
+    # The webhook secret is the HMAC key and the X-Merchant-Key. It is a secret.
+    youpi_api_url: str = ""
+    youpi_merchant_id: str = ""
+    youpi_webhook_secret: str = ""
 
     @field_validator(
         "gemma_api_key", "gemma_base_url", "elevenlabs_api_key",
         "backboard_api_key", "resend_api_key", "email_from",
+        "youpi_api_url", "youpi_merchant_id", "youpi_webhook_secret",
     )
     @classmethod
     def blank_placeholder(cls, value: str) -> str:

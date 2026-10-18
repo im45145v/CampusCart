@@ -1,30 +1,36 @@
+import hashlib
+import hmac
+import json
 from typing import Any
-from uuid import uuid4
 
 import httpx
+import pytest
 
-from .conftest import Actor, make_product, make_user
+from app.config import get_settings
+from app.services import youpi
+from app.services.wallet import credit
+
+from .conftest import Actor, make_product
 from .test_reviews_reports_admin import make_admin
 
+SECRET = "test-youpi-webhook-secret"
 
-def _txn() -> str:
-    return f"UTR{uuid4().hex[:16]}"
+
+def _sign(raw: bytes) -> str:
+    digest = hmac.new(SECRET.encode(), raw, hashlib.sha256).hexdigest()
+    return "sha256=" + digest
+
+
+def _enable_youpi(monkeypatch: pytest.MonkeyPatch) -> None:
+    settings = get_settings()
+    monkeypatch.setattr(settings, "youpi_api_url", "http://youpi.test")
+    monkeypatch.setattr(settings, "youpi_merchant_id", "merchant-1")
+    monkeypatch.setattr(settings, "youpi_webhook_secret", SECRET)
 
 
 async def _wallet(client: httpx.AsyncClient, actor: Actor, amount: int = 50_00, *, database: Any) -> None:
-    r = await client.post(
-        "/api/me/wallet/add", headers=actor.headers,
-        json={"amount_minor": amount, "method": "upi", "note": "desk", "transaction_id": _txn()},
-    )
-    assert r.status_code == 201, r.text
-    assert r.json()["status"] == "requested"
-    admin = await make_user(client, f"Desk{uuid4().hex[:8]}")
-    await database.users.update_one({"_id": admin.id}, {"$addToSet": {"roles": "admin"}})
-    approved = await client.post(
-        f"/api/admin/wallet/{r.json()['id']}/approve", headers=admin.headers,
-    )
-    assert approved.status_code == 200, approved.text
-    assert approved.json()["status"] == "posted"
+    del client
+    await credit(database, actor.id, amount, "topup", note="test load", method="youpi")
 
 
 async def test_add_and_remove_funds(
@@ -32,59 +38,24 @@ async def test_add_and_remove_funds(
 ) -> None:
     desk = await client.get("/api/payments/desk")
     assert desk.status_code == 200
-    assert set(desk.json()) == {"upi_id"}
-    assert desk.json()["upi_id"] == "im45145v@oksbi"
-    missing = await client.post(
+    assert set(desk.json()) == {"provider", "checkout"}
+    assert desk.json()["provider"] == "youpi"
+    retired = await client.post(
         "/api/me/wallet/add", headers=buyer.headers,
-        json={"amount_minor": 20_00, "method": "upi", "note": "desk"},
+        json={"amount_minor": 20_00, "method": "upi", "note": "desk", "transaction_id": "UTRDESK0001"},
     )
-    assert missing.status_code == 422
-    blank = await client.post(
-        "/api/me/wallet/add", headers=buyer.headers,
-        json={"amount_minor": 20_00, "method": "upi", "note": "desk", "transaction_id": "   "},
-    )
-    assert blank.status_code == 422
-    txn = "UTRDESK0001"
-    requested = await client.post(
-        "/api/me/wallet/add", headers=buyer.headers,
-        json={"amount_minor": 20_00, "method": "upi", "note": "desk", "transaction_id": txn},
-    )
-    assert requested.status_code == 201, requested.text
-    body = requested.json()
-    assert body["status"] == "requested"
-    assert body["transaction_id"] == txn
-    waiting = (await client.get("/api/me/wallet", headers=buyer.headers)).json()
-    assert waiting["balance_minor"] == 0
-    assert waiting["upi_id"] == "im45145v@oksbi"
-    replay = await client.post(
-        "/api/me/wallet/add", headers=buyer.headers,
-        json={"amount_minor": 20_00, "method": "upi", "note": "desk", "transaction_id": txn},
-    )
-    assert replay.status_code == 201
-    assert replay.json()["id"] == body["id"]
+    assert retired.status_code == 410
     assert (await client.get("/api/me/wallet", headers=buyer.headers)).json()["balance_minor"] == 0
     broke = await client.post(
         "/api/me/wallet/remove", headers=buyer.headers,
         json={"amount_minor": 10_00, "note": "too soon"},
     )
     assert broke.status_code == 409
-    stranger = await make_user(client, "Isha")
-    stolen = await client.post(
-        "/api/me/wallet/add", headers=stranger.headers,
-        json={"amount_minor": 20_00, "method": "upi", "note": "mine", "transaction_id": txn},
-    )
-    assert stolen.status_code == 409
-    assert (await client.post(
-        f"/api/admin/wallet/{body['id']}/approve", headers=buyer.headers,
-    )).status_code == 403
-    admin = await make_admin(client, database)
-    approved = await client.post(f"/api/admin/wallet/{body['id']}/approve", headers=admin.headers)
-    assert approved.status_code == 200, approved.text
-    assert approved.json()["status"] == "posted"
-    again = await client.post(f"/api/admin/wallet/{body['id']}/approve", headers=admin.headers)
-    assert again.status_code == 200
+    await _wallet(client, buyer, 20_00, database=database)
     wallet = (await client.get("/api/me/wallet", headers=buyer.headers)).json()
     assert wallet["balance_minor"] == 20_00
+    assert wallet["checkout"] == "unavailable"
+    admin = await make_admin(client, database)
     low = await client.post(
         "/api/me/wallet/remove", headers=buyer.headers,
         json={"amount_minor": 100, "note": "back to desk"},
@@ -118,41 +89,132 @@ async def test_add_and_remove_funds(
     assert (await client.get("/api/me/wallet", headers=buyer.headers)).json()["balance_minor"] == 10_00
 
 
-async def test_declined_topup_does_not_credit(
-    client: httpx.AsyncClient, buyer: Actor, database: Any
+async def test_youpi_callback_credits_once(
+    client: httpx.AsyncClient, buyer: Actor, database: Any, monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    txn = "UTRDECLINE01"
-    requested = await client.post(
-        "/api/me/wallet/add", headers=buyer.headers,
-        json={"amount_minor": 15_00, "method": "upi", "note": "maybe", "transaction_id": txn},
+    _enable_youpi(monkeypatch)
+
+    async def fake_create(order_id: str, amount_minor: int, return_url: str) -> dict[str, str]:
+        assert amount_minor == 20_00
+        assert return_url.endswith("/account")
+        return {"paymentId": f"pay-{order_id}", "checkoutUrl": f"http://youpi.test/checkout/{order_id}"}
+
+    async def fake_fetch(payment_id: str) -> dict[str, Any]:
+        order_id = payment_id.removeprefix("pay-")
+        return {
+            "paymentId": payment_id, "orderId": order_id, "status": "SUCCESS", "method": "UPI",
+            "amountPaise": 20_00, "verificationLevel": 1, "verificationTag": "Single Verification",
+            "verificationSources": ["SMS"],
+        }
+
+    monkeypatch.setattr(youpi, "create_payment", fake_create)
+    monkeypatch.setattr(youpi, "fetch_payment", fake_fetch)
+    opened = await client.post(
+        "/api/me/wallet/checkout", headers=buyer.headers, json={"amount_minor": 20_00},
     )
-    assert requested.status_code == 201, requested.text
-    admin = await make_admin(client, database)
-    declined = await client.post(
-        f"/api/admin/wallet/{requested.json()['id']}/reject", headers=admin.headers,
-    )
-    assert declined.status_code == 200
-    assert declined.json()["status"] == "rejected"
+    assert opened.status_code == 201, opened.text
+    body = opened.json()
+    assert body["status"] == "requested"
+    assert body["checkout_url"] == f"http://youpi.test/checkout/{body['id']}"
     assert (await client.get("/api/me/wallet", headers=buyer.headers)).json()["balance_minor"] == 0
-    assert (await client.post(
-        f"/api/admin/wallet/{requested.json()['id']}/approve", headers=admin.headers,
-    )).status_code == 409
-    retry = await client.post(
-        "/api/me/wallet/add", headers=buyer.headers,
-        json={"amount_minor": 15_00, "method": "upi", "note": "maybe", "transaction_id": txn},
+    same = await client.post(
+        "/api/me/wallet/checkout", headers=buyer.headers, json={"amount_minor": 20_00},
     )
-    assert retry.status_code == 201
-    assert retry.json()["id"] != requested.json()["id"]
-    assert retry.json()["status"] == "requested"
-    for n in range(2):
+    assert same.json()["id"] == body["id"]
+    admin = await make_admin(client, database)
+    assert (await client.post(
+        f"/api/admin/wallet/{body['id']}/approve", headers=admin.headers,
+    )).status_code == 409
+
+    payload = {
+        "event": "SUCCESS", "paymentId": body["youpi_payment_id"], "orderId": body["id"],
+        "amount": "20.00", "amountPaise": 20_00, "currency": "INR", "method": "UPI",
+    }
+    raw = json.dumps(payload).encode()
+    unsigned = await client.post("/api/payments/youpi", content=raw)
+    assert unsigned.status_code == 401
+    assert (await client.get("/api/me/wallet", headers=buyer.headers)).json()["balance_minor"] == 0
+    browser = await client.post(
+        "/api/payments/youpi", headers={"X-Gateway-Signature": _sign(raw)},
+        json={"event": "SUCCESS", "credited": True},
+    )
+    assert browser.status_code == 401
+
+    cod = dict(payload, method="COD")
+    cod_raw = json.dumps(cod).encode()
+    ignored = await client.post(
+        "/api/payments/youpi", content=cod_raw, headers={"X-Gateway-Signature": _sign(cod_raw)},
+    )
+    assert ignored.status_code == 200
+    assert ignored.json()["credited"] is False
+    assert (await client.get("/api/me/wallet", headers=buyer.headers)).json()["balance_minor"] == 0
+
+    confirmed = await client.post(
+        "/api/payments/youpi", content=raw, headers={"X-Gateway-Signature": _sign(raw)},
+    )
+    assert confirmed.status_code == 200, confirmed.text
+    assert confirmed.json()["credited"] is True
+    assert (await client.get("/api/me/wallet", headers=buyer.headers)).json()["balance_minor"] == 20_00
+    again = await client.post(
+        "/api/payments/youpi", content=raw, headers={"X-Gateway-Signature": _sign(raw)},
+    )
+    assert again.status_code == 200
+    assert (await client.get("/api/me/wallet", headers=buyer.headers)).json()["balance_minor"] == 20_00
+
+
+async def test_youpi_rejects_a_signed_callback_the_gateway_does_not_confirm(
+    client: httpx.AsyncClient, buyer: Actor, monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    _enable_youpi(monkeypatch)
+
+    async def fake_create(order_id: str, amount_minor: int, return_url: str) -> dict[str, str]:
+        del amount_minor, return_url
+        return {"paymentId": f"pay-{order_id}", "checkoutUrl": f"http://youpi.test/checkout/{order_id}"}
+
+    async def fake_fetch(payment_id: str) -> dict[str, Any]:
+        return {
+            "paymentId": payment_id, "orderId": payment_id.removeprefix("pay-"),
+            "status": "SUCCESS", "method": "COD", "amountPaise": "2000",
+            "verificationLevel": 1, "verificationTag": "COD_ORDER_PLACED",
+            "verificationSources": [],
+        }
+
+    monkeypatch.setattr(youpi, "create_payment", fake_create)
+    monkeypatch.setattr(youpi, "fetch_payment", fake_fetch)
+    opened = await client.post(
+        "/api/me/wallet/checkout", headers=buyer.headers, json={"amount_minor": 20_00},
+    )
+    body = opened.json()
+    payload = {
+        "event": "SUCCESS", "paymentId": body["youpi_payment_id"], "orderId": body["id"],
+        "amountPaise": 20_00, "method": "UPI",
+    }
+    raw = json.dumps(payload).encode()
+    response = await client.post(
+        "/api/payments/youpi", content=raw, headers={"X-Gateway-Signature": _sign(raw)},
+    )
+    assert response.status_code == 200
+    assert response.json()["credited"] is False
+    assert (await client.get("/api/me/wallet", headers=buyer.headers)).json()["balance_minor"] == 0
+
+
+async def test_youpi_checkout_respects_the_daily_cap(
+    client: httpx.AsyncClient, buyer: Actor, monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    _enable_youpi(monkeypatch)
+
+    async def fake_create(order_id: str, amount_minor: int, return_url: str) -> dict[str, str]:
+        del amount_minor, return_url
+        return {"paymentId": f"pay-{order_id}", "checkoutUrl": f"http://youpi.test/checkout/{order_id}"}
+
+    monkeypatch.setattr(youpi, "create_payment", fake_create)
+    for amount in (2_000_00, 1_500_00):
         row = await client.post(
-            "/api/me/wallet/add", headers=buyer.headers,
-            json={"amount_minor": 2_000_00, "method": "upi", "note": "cap", "transaction_id": f"UTRCAP{n}"},
+            "/api/me/wallet/checkout", headers=buyer.headers, json={"amount_minor": amount},
         )
         assert row.status_code == 201, row.text
     capped = await client.post(
-        "/api/me/wallet/add", headers=buyer.headers,
-        json={"amount_minor": 2_000_00, "method": "upi", "note": "cap", "transaction_id": "UTRCAP9"},
+        "/api/me/wallet/checkout", headers=buyer.headers, json={"amount_minor": 1_600_00},
     )
     assert capped.status_code == 409
     assert (await client.get("/api/me/wallet", headers=buyer.headers)).json()["balance_minor"] == 0
@@ -170,18 +232,8 @@ async def test_admin_reverses_a_topup(
     reversed_row = await client.post(f"/api/admin/wallet/{topups[0]['id']}/reverse", headers=admin.headers)
     assert reversed_row.status_code == 200, reversed_row.text
     assert (await client.get("/api/me/wallet", headers=buyer.headers)).json()["balance_minor"] == 0
-    again = await client.post(
-        "/api/me/wallet/add", headers=buyer.headers,
-        json={"amount_minor": 20_00, "method": "campus_desk", "note": "again",
-              "transaction_id": "UTRAGAIN0001"},
-    )
-    assert again.status_code == 201, again.text
-    assert (await client.get("/api/me/wallet", headers=buyer.headers)).json()["balance_minor"] == 0
-    approved = await client.post(
-        f"/api/admin/wallet/{again.json()['id']}/approve", headers=admin.headers,
-    )
-    assert approved.status_code == 200, approved.text
-    payout = approved.json()
+    await _wallet(client, buyer, 20_00, database=database)
+    payout = (await client.get("/api/me/wallet", headers=buyer.headers)).json()["entries"][0]
     assert (await client.post(
         "/api/me/wallet/remove", headers=buyer.headers,
         json={"amount_minor": 10_00, "note": "desk Friday"},

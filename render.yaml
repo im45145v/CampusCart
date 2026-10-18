@@ -41,6 +41,12 @@ services:
         sync: false
       - key: PUBLIC_WEB_URL
         sync: false
+      - key: YOUPI_API_URL
+        sync: false
+      - key: YOUPI_MERCHANT_ID
+        sync: false
+      - key: YOUPI_WEBHOOK_SECRET
+        sync: false
       - key: ADMIN_UPI_ID
         value: im45145v@oksbi
       - key: SEED_DEMO

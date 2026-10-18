@@ -7,6 +7,7 @@ import httpx
 
 from app import db
 from app.audit import record
+from app.services.wallet import credit
 from app.util import new_id, now
 
 API = os.environ.get("CAMPUSCART_SEED_API", "http://127.0.0.1:8000")
@@ -368,32 +369,16 @@ async def seed() -> None:
                 published.raise_for_status()
                 print(f"  listed {raw['title']}")
         loaded = await database.wallet_ledger.find_one(
-            {"user_id": buyer["id"], "note": "demo desk load", "reason": "topup"},
+            {"user_id": buyer["id"], "note": "demo desk load", "reason": "topup", "status": "posted"},
         )
-        if loaded and loaded.get("status") == "posted":
+        if loaded:
             print("wallet already loaded")
         else:
-            await database.users.update_one(
-                {"_id": admin["id"]}, {"$addToSet": {"roles": "admin"}},
+            await database.wallet_ledger.update_many(
+                {"user_id": buyer["id"], "note": "demo desk load", "reason": "topup", "status": "requested"},
+                {"$set": {"status": "expired"}, "$unset": {"transaction_key": ""}},
             )
-            if loaded and loaded.get("status") == "requested":
-                entry_id = loaded["_id"]
-            else:
-                topup = await client.post(
-                    "/api/me/wallet/add",
-                    headers={"Authorization": "Bearer " + buyer["token"]},
-                    json={
-                        "amount_minor": 50000, "method": "upi", "note": "demo desk load",
-                        "transaction_id": "demo-desk-load",
-                    },
-                )
-                topup.raise_for_status()
-                entry_id = topup.json()["id"]
-            approved = await client.post(
-                f"/api/admin/wallet/{entry_id}/approve",
-                headers={"Authorization": "Bearer " + admin["token"]},
-            )
-            approved.raise_for_status()
+            await credit(database, buyer["id"], 50000, "topup", note="demo desk load", method="youpi")
             print("wallet loaded")
 
     user = await database.users.find_one({"email": ADMIN[1]})

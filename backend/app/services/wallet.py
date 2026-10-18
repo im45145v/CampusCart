@@ -1,13 +1,15 @@
-"""Campus wallet: an on-campus credit ledger, not a bank or UPI payment.
+"""Campus wallet: an on-campus credit ledger.
 
-A top-up stores the transaction ID the student typed and stays requested until
-an admin approves it. That ID is not proof of payment, and the spendable balance
-does not move until approval. Staff can still reverse a posted top-up. Payouts
-leave the balance when requested; staff mark them paid or return them.
+A new top-up opens a YouPI-PG checkout and stays requested until YouPI's signed
+callback is verified and YouPI's payment record is a verified UPI success.
+A typed transaction ID is not accepted, and an admin cannot approve a YouPI
+top-up. Staff can still reverse a posted top-up. Payouts leave the balance
+when requested; staff mark them paid or return them.
 Balances are integer minor units. Debits only succeed when the stored balance
 covers the amount.
 """
 
+from datetime import timedelta
 from typing import Any, Literal
 
 from fastapi import HTTPException
@@ -15,9 +17,11 @@ from pymongo import ReturnDocument
 from pymongo.errors import DuplicateKeyError
 
 from ..audit import record
+from ..config import get_settings
 from ..db import Database
 from ..ratelimit import limiter
 from ..util import new_id, now
+from . import youpi
 
 Reason = Literal[
     "topup", "withdrawal", "order_payment", "order_refund", "order_earning",
@@ -100,34 +104,7 @@ def guard(user_id: str) -> None:
         raise HTTPException(429, "Too many wallet requests, slow down")
 
 
-async def _active_topup(db: Database, transaction_id: str) -> dict[str, Any] | None:
-    return await db.wallet_ledger.find_one({
-        "reason": "topup", "transaction_id": transaction_id,
-        "status": {"$in": ["requested", "posted"]},
-    })
-
-
-async def add_funds(
-    db: Database, user_id: str, amount: int, method: str, note: str, transaction_id: str,
-) -> dict[str, Any]:
-    """Request a campus-ledger top-up. The typed ID does not verify UPI or a bank.
-
-    The row stays `requested` and the spendable balance does not change until an
-    admin approves it. Sending the same ID again returns the existing row.
-    """
-    guard(user_id)
-    txn = transaction_id.strip()
-    if not txn:
-        raise HTTPException(422, "Add the UPI transaction ID")
-    if amount < TOPUP_MIN or amount > TOPUP_MAX:
-        raise HTTPException(422, "Top-up must be between ₹10 and ₹2,000")
-    if method == "reference" and len(note.strip()) < 4:
-        raise HTTPException(422, "Add the reference the campus desk gave you")
-    existing = await _active_topup(db, txn)
-    if existing:
-        if existing["user_id"] != user_id:
-            raise HTTPException(409, "That transaction ID is already on another wallet")
-        return existing
+async def _topup_used_today(db: Database, user_id: str) -> int:
     start = now().replace(hour=0, minute=0, second=0, microsecond=0)
     today = 0
     async for row in db.wallet_ledger.find({
@@ -135,30 +112,125 @@ async def add_funds(
         "status": {"$in": ["requested", "posted"]},
     }):
         today += int(row["amount_minor"])
-    if today + amount > TOPUP_DAY_MAX:
+    return today
+
+
+async def _expire_stale_checkouts(db: Database, user_id: str) -> None:
+    cutoff = now() - timedelta(minutes=20)
+    await db.wallet_ledger.update_many(
+        {
+            "user_id": user_id, "reason": "topup", "method": "youpi",
+            "status": "requested", "created_at": {"$lt": cutoff},
+        },
+        {"$set": {"status": "expired"}},
+    )
+
+
+async def start_youpi_checkout(db: Database, user_id: str, amount: int) -> dict[str, Any]:
+    """Open a YouPI checkout. The spendable balance does not change."""
+    guard(user_id)
+    if not youpi.configured():
+        raise HTTPException(503, "UPI checkout is not configured yet")
+    if amount < TOPUP_MIN or amount > TOPUP_MAX:
+        raise HTTPException(422, "Top-up must be between ₹10 and ₹2,000")
+    await _expire_stale_checkouts(db, user_id)
+    if await _topup_used_today(db, user_id) + amount > TOPUP_DAY_MAX:
         raise HTTPException(409, "Daily top-up limit is ₹5,000")
+    fresh = now() - timedelta(minutes=20)
+    open_row = await db.wallet_ledger.find_one({
+        "user_id": user_id, "reason": "topup", "method": "youpi", "status": "requested",
+        "amount_minor": amount, "created_at": {"$gte": fresh}, "checkout_url": {"$type": "string"},
+    })
+    if open_row:
+        return open_row
     balance = await balance_of(db, user_id)
     entry = _entry(
-        user_id, amount, "credit", "topup", balance, note=note.strip(), method=method,
-        status="requested", transaction_id=txn,
+        user_id, amount, "credit", "topup", balance, method="youpi", status="requested",
     )
+    await db.wallet_ledger.insert_one(entry)
+    return_url = get_settings().public_web_url.rstrip("/") + "/account"
     try:
-        await db.wallet_ledger.insert_one(entry)
+        created = await youpi.create_payment(entry["_id"], amount, return_url)
+    except youpi.YoupiError as err:
+        await db.wallet_ledger.delete_one({"_id": entry["_id"]})
+        raise HTTPException(err.status, err.detail) from err
+    try:
+        await db.wallet_ledger.update_one(
+            {"_id": entry["_id"]},
+            {"$set": {
+                "youpi_payment_id": created["paymentId"],
+                "checkout_url": created["checkoutUrl"],
+                "transaction_id": created["paymentId"],
+                "transaction_key": created["paymentId"],
+            }},
+        )
     except DuplicateKeyError:
-        raced = await _active_topup(db, txn)
-        if raced and raced["user_id"] == user_id:
-            return raced
-        raise HTTPException(409, "That transaction ID is already on another wallet") from None
-    await record(db, user_id, "wallet.topup_requested", "wallet", entry["_id"],
-                 {"amount_minor": amount, "transaction_id": txn})
+        await db.wallet_ledger.delete_one({"_id": entry["_id"]})
+        raise HTTPException(409, "That checkout is already open") from None
+    await record(db, user_id, "wallet.topup_checkout", "wallet", entry["_id"],
+                 {"amount_minor": amount, "payment_id": created["paymentId"]})
+    saved = await db.wallet_ledger.find_one({"_id": entry["_id"]})
+    assert saved is not None
+    return saved
+
+
+async def apply_youpi_callback(db: Database, payload: dict[str, Any]) -> tuple[int, dict[str, Any]]:
+    """Credit one requested top-up when the signed callback and YouPI's record agree.
+
+    A browser flag is not an input. Cash-on-delivery, an unverified tag, a mismatched
+    amount, and a payment id we did not create are ignored.
+    """
+    order_id = str(payload.get("orderId") or "")
+    payment_id = str(payload.get("paymentId") or "")
+    event = str(payload.get("event") or "").upper()
+    method = str(payload.get("method") or "").upper()
+    entry = await db.wallet_ledger.find_one({"_id": order_id, "reason": "topup", "method": "youpi"})
+    if not entry or entry.get("youpi_payment_id") != payment_id:
+        return 200, {"credited": False}
+    if entry.get("status") == "posted" and entry.get("balance_applied"):
+        return 200, {"credited": True}
+    if event in {"FAILED", "EXPIRED", "CANCELLED"} and entry.get("status") == "requested":
+        await db.wallet_ledger.update_one(
+            {"_id": order_id, "status": "requested"}, {"$set": {"status": "expired"}},
+        )
+        return 200, {"credited": False}
+    raw_paise = payload.get("amountPaise")
+    if isinstance(raw_paise, bool) or not isinstance(raw_paise, (int, str)):
+        return 200, {"credited": False}
+    try:
+        webhook_paise = int(raw_paise)
+    except ValueError:
+        return 200, {"credited": False}
+    if event != "SUCCESS" or method != "UPI" or webhook_paise != int(entry["amount_minor"]):
+        return 200, {"credited": False}
+    try:
+        remote = await youpi.fetch_payment(payment_id)
+    except youpi.YoupiError:
+        return 503, {"detail": "YouPI payment could not be re-read"}
+    if not youpi.is_verified_upi(remote, order_id, int(entry["amount_minor"]), payment_id):
+        return 200, {"credited": False}
+    won = await db.wallet_ledger.find_one_and_update(
+        {"_id": order_id, "reason": "topup", "method": "youpi", "status": "requested"},
+        {"$set": {"status": "posted", "approved_by": "youpi", "approved_at": now()}},
+        return_document=ReturnDocument.AFTER,
+    )
+    if won is None:
+        current = await db.wallet_ledger.find_one({"_id": order_id})
+        if not current or current.get("status") != "posted":
+            return 200, {"credited": False}
+        if not current.get("balance_applied"):
+            await _apply_topup_credit(db, order_id)
+        return 200, {"credited": True}
+    await _apply_topup_credit(db, order_id)
+    await record(db, "youpi", "wallet.topup_confirmed", "wallet", order_id,
+                 {"amount_minor": int(entry["amount_minor"]), "user_id": entry["user_id"]})
     from . import notifications
     await notifications.notify(
-        db, user_id, "wallet", "Top-up waiting",
-        "The desk has to confirm this top-up before you can spend it. "
-        "The transaction ID is not proof of payment.",
-        "/account", entry["_id"],
+        db, entry["user_id"], "wallet", "Top-up confirmed",
+        "YouPI confirmed this UPI payment. The credits are now spendable.",
+        "/account", order_id,
     )
-    return entry
+    return 200, {"credited": True}
 
 
 async def remove_funds(db: Database, user_id: str, amount: int, note: str) -> dict[str, Any]:
@@ -223,7 +295,10 @@ async def _apply_topup_credit(db: Database, entry_id: str) -> dict[str, Any]:
 
 
 async def approve_topup(db: Database, entry_id: str, admin_id: str) -> dict[str, Any]:
-    """Move a requested top-up to posted and add it to the spendable balance once."""
+    """Move an older desk top-up to posted. YouPI rows are confirmed only by the callback."""
+    existing = await db.wallet_ledger.find_one({"_id": entry_id, "reason": "topup"}, {"method": 1})
+    if existing and existing.get("method") == "youpi":
+        raise HTTPException(409, "YouPI top-ups are confirmed by the signed payment callback")
     won = await db.wallet_ledger.find_one_and_update(
         {"_id": entry_id, "reason": "topup", "status": "requested"},
         {"$set": {"status": "posted", "approved_by": admin_id, "approved_at": now()}},
