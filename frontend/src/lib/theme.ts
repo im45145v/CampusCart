@@ -8,7 +8,7 @@ export const DEFAULT_ORDER_SETTINGS: OrderSettings = {
 }
 
 export const DEFAULT_THEME: StoreTheme = {
-  primary: '#20B8A5', accent: '#142B3B', background: '#F7F5EF', font: 'modern', radius: 'soft',
+  primary: '#0E6E62', accent: '#12312C', background: '#F3F6F4', font: 'modern', radius: 'soft',
 }
 
 export const THEME_PRESETS: { name: string; theme: StoreTheme }[] = [
@@ -58,7 +58,7 @@ export function contrast(a: string, b: string): number {
 export function themeStyle(theme: StoreTheme | undefined): CSSProperties {
   const t = { ...DEFAULT_THEME, ...theme }
   const [lg, xl, xxl] = RADII[t.radius]
-  const onPrimary = contrast('#ffffff', t.primary) >= contrast('#142B3B', t.primary) ? '#ffffff' : '#142B3B'
+  const onPrimary = contrast('#ffffff', t.primary) >= contrast('#12312C', t.primary) ? '#ffffff' : '#12312C'
   return {
     '--color-terracotta': t.primary,
     '--color-terracotta-dark': shade(t.primary, -0.18),

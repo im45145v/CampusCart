@@ -1,5 +1,6 @@
 """Seed the three campus demo stores. Safe to run again: existing emails are reused."""
 import asyncio
+import os
 from typing import Any
 
 import httpx
@@ -8,7 +9,7 @@ from app import db
 from app.audit import record
 from app.util import new_id, now
 
-API = "http://127.0.0.1:8000"
+API = os.environ.get("CAMPUSCART_SEED_API", "http://127.0.0.1:8000")
 BUYER = ("Campus Student", "student.buyer@campus.test", "CampusBuyer1")
 ADMIN = ("Campus Desk", "desk.admin@campus.test", "CampusDesk1")
 

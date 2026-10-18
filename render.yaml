@@ -43,6 +43,8 @@ services:
         sync: false
       - key: ADMIN_UPI_ID
         value: im45145v@oksbi
+      - key: SEED_DEMO
+        sync: false
   - type: web
     name: campuscart-web
     runtime: static

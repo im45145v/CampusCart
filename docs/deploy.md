@@ -28,7 +28,7 @@ This is the data layer behind the app. Atlas Vector Search is not wired up.
    - `ADMIN_UPI_ID` — desk UPI shown when a student adds wallet funds. The blueprint default is `im45145v@oksbi`. It is a public address, not a secret. Changing it does not verify payments.
 3. On `campuscart-web`, set `VITE_API_URL` to the API origin, for example `https://campuscart-api.onrender.com`, with no trailing slash. Rebuild the static site after changing it. The browser derives the chat socket from that URL.
 4. Confirm `GET https://<api>/api/health` returns ok.
-5. From a machine that can reach Atlas, run `python -m scripts.seed_campus_stores` with `MONGODB_URI` pointing at the same cluster and the script's API base (`http://127.0.0.1:8000` in the script) changed only if you seed through a tunnel. The script talks to the API, so the simplest path is to seed a local API whose `MONGODB_URI` is the Atlas cluster.
+5. To load the demo stalls on that cluster, set `SEED_DEMO=1` on the API and redeploy. The process loads Kaaram & Ko, Campus Brewers, Tanuj Prints, and Potato's Makerspace after it is accepting requests, then you can set `SEED_DEMO` back to empty. From a machine that can reach Atlas, `python -m scripts.seed_campus_stores` does the same thing against a local API whose `MONGODB_URI` is that cluster. `CAMPUSCART_SEED_API` overrides the script's API base (`http://127.0.0.1:8000`).
 
 Uploaded images and print files are stored on the API's local disk. Render's disk is ephemeral. The seeded catalogue has no uploaded photos, so the stalls survive a restart. A print file uploaded for a demo does not.
 

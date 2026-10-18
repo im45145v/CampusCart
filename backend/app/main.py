@@ -1,3 +1,6 @@
+import asyncio
+import logging
+import os
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 from pathlib import Path
@@ -28,12 +31,35 @@ from .routers import (
     ws,
 )
 
+log = logging.getLogger(__name__)
+
+
+async def _seed_demo() -> None:
+    """Load the campus stalls once the process is accepting requests. Safe to run again."""
+    port = os.environ.get("PORT", "8000")
+    os.environ["CAMPUSCART_SEED_API"] = f"http://127.0.0.1:{port}"
+    from scripts import seed_campus_stores as seed
+
+    seed.API = os.environ["CAMPUSCART_SEED_API"]
+    for attempt in range(8):
+        await asyncio.sleep(2)
+        try:
+            await seed.seed()
+        except Exception:
+            log.exception("demo seed attempt %s failed", attempt + 1)
+            continue
+        log.info("demo catalogue seeded")
+        return
+    log.error("demo catalogue was not seeded")
+
 
 @asynccontextmanager
 async def lifespan(_: FastAPI) -> AsyncIterator[None]:
     get_settings().validate_for_runtime()
     if db.holder.db is None:
         await db.connect()
+    if os.environ.get("SEED_DEMO", "").lower() in {"1", "true", "yes"}:
+        asyncio.create_task(_seed_demo())
     yield
 
 
