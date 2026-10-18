@@ -18,7 +18,7 @@ routers in `backend/app/routers/` are the source of truth.
 | Account | saved stores under `/me/saved-stores`, `GET /seller/summary`, `GET /seller/charts`, API tokens under `/seller/api-tokens` |
 | Reports | `POST /reports` |
 | Admin | users, stores, products moderation, reports (`/admin/reports`, `/resolve`, reported conversation), `GET /admin/audit`, `POST /admin/stores/{id}/decision` (`approved` or `rejected` while `pending`) |
-| AI | `POST /ai/listing-draft` and `POST /ai/transcribe` use hosted Gemma 4 when `GEMMA_API_KEY` is set (503 means type the listing) |
+| AI | `POST /ai/listing-draft` uses hosted Gemma 4 when `GEMMA_API_KEY` is set, then Backboard when `BACKBOARD_API_KEY` is set. `POST /ai/transcribe` uses Gemma, then ElevenLabs. 503 means type the listing |
 | Uploads | `POST /uploads` (seller; PNG/JPEG/WebP), `POST /uploads/documents` (any logged-in user; PDF or image, page count returned) |
 | Edge | `GET /edge/pending-orders`, `/edge/orders/{id}/summary`, `/edge/low-stock`, `/edge/today-sales`, `/edge/products/availability` (API token only) |
 

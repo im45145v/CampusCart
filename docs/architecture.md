@@ -4,6 +4,7 @@
 React SPA (frontend/)  --REST-->  FastAPI (backend/app) --> MongoDB Atlas
         |                              ^   |
         +------ WebSocket /ws/chat ----+   +--> Gemma 4 (Gemini generateContent, or a local OpenAI-compatible URL)
+                                           +--> Backboard text model (secondary, when Gemma is unset or that call fails)
                                            +--> ElevenLabs speech-to-text (optional fallback)
 UNO Q service (edge/uno_q) --read-only API token--> /api/edge/*
 ```
@@ -42,7 +43,8 @@ UNO Q service (edge/uno_q) --read-only API token--> /api/edge/*
   one backend instance a pub/sub layer (e.g. Redis) is required. Chat does not depend on AI/speech/edge integrations;
   if the WebSocket is down the client falls back to the REST send endpoint.
 - **AI:** `app/services/llm.py` turns informal text into a draft with hosted Gemma 4 when `GEMMA_API_KEY` is set.
-  Dictation sends the recording to the same model. Output is validated; price, stock and prep time are
+  `BACKBOARD_API_KEY` is the secondary text model: it drafts when Gemma is unset, and when a Gemma call fails.
+  Dictation sends the recording to Gemma, then ElevenLabs. Backboard does not accept audio. Output is validated; price, stock and prep time are
   dropped unless the number literally appears in the seller's text. The AI never publishes: the seller reviews and
   submits the form, and listings start unpublished. `GEMMA_BASE_URL` keeps the local OpenAI-compatible path.
 - **Edge:** `edge/uno_q` is a separate service using scoped read-only tokens (`cc_...`, stored hashed).

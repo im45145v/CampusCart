@@ -97,11 +97,111 @@ def test_api_key_selects_hosted_gemma_4(monkeypatch: pytest.MonkeyPatch) -> None
 
     monkeypatch.setenv("GEMMA_API_KEY", "studio-key")
     monkeypatch.setenv("GEMMA_BASE_URL", "")
+    monkeypatch.setenv("BACKBOARD_API_KEY", "")
     get_settings.cache_clear()
     try:
         provider = llm.get_provider()
         assert isinstance(provider, llm.GoogleGemmaProvider)
         assert provider.model == "gemma-4-26b-a4b-it"
+    finally:
+        get_settings.cache_clear()
+
+
+def test_placeholder_keys_leave_the_assistant_off(monkeypatch: pytest.MonkeyPatch) -> None:
+    from app.config import get_settings
+
+    monkeypatch.setenv("GEMMA_API_KEY", "paste-key-here")
+    monkeypatch.setenv("GEMMA_BASE_URL", "")
+    monkeypatch.setenv("BACKBOARD_API_KEY", "paste-key-here")
+    get_settings.cache_clear()
+    try:
+        assert llm.get_provider() is None
+    finally:
+        get_settings.cache_clear()
+
+
+async def test_backboard_request_shape() -> None:
+    seen: dict[str, Any] = {}
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        seen["url"] = str(request.url)
+        seen["key"] = request.headers.get("x-api-key")
+        seen["body"] = json.loads(request.content)
+        return httpx.Response(200, json={"content": "{\"title\": \"Chai\"}"})
+
+    provider = llm.BackboardProvider(
+        "bb-key", "openai", "gpt-4o", transport=httpx.MockTransport(handler),
+    )
+    assert await provider.complete("system", "note") == '{"title": "Chai"}'
+    assert seen["url"] == "https://app.backboard.io/api/threads/messages"
+    assert seen["key"] == "bb-key"
+    assert seen["body"]["llm_provider"] == "openai"
+    assert seen["body"]["model_name"] == "gpt-4o"
+    assert seen["body"]["content"].startswith("system")
+
+
+def test_gemma_failure_uses_backboard(monkeypatch: pytest.MonkeyPatch) -> None:
+    from app.config import get_settings
+
+    monkeypatch.setenv("GEMMA_API_KEY", "studio-key")
+    monkeypatch.setenv("GEMMA_BASE_URL", "")
+    monkeypatch.setenv("BACKBOARD_API_KEY", "bb-key")
+    monkeypatch.setenv("BACKBOARD_LLM_PROVIDER", "openai")
+    monkeypatch.setenv("BACKBOARD_MODEL", "gpt-4o")
+    get_settings.cache_clear()
+    try:
+        provider = llm.get_provider()
+        assert isinstance(provider, llm.FallbackProvider)
+    finally:
+        get_settings.cache_clear()
+
+
+async def test_fallback_complete_calls_backboard_after_gemma_fails() -> None:
+    class Down:
+        async def complete(self, system: str, user: str) -> str:
+            raise llm.LLMUnavailable("gemma down")
+
+        async def transcribe(self, data: bytes, mime: str) -> str:
+            raise llm.LLMUnavailable("no audio")
+
+    seen: dict[str, Any] = {}
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        seen["called"] = True
+        return httpx.Response(200, json={"content": "ok"})
+
+    secondary = llm.BackboardProvider("bb-key", "openai", "gpt-4o", transport=httpx.MockTransport(handler))
+    assert await llm.FallbackProvider(Down(), secondary).complete("system", "note") == "ok"
+    assert seen["called"] is True
+
+
+def test_uri_in_database_name_is_used_as_the_connection(monkeypatch: pytest.MonkeyPatch) -> None:
+    from app.config import get_settings
+
+    monkeypatch.setenv("MONGODB_URI", "mongodb://localhost:27017")
+    monkeypatch.setenv(
+        "MONGODB_DB",
+        "mongodb+srv://campuscart:secret@cluster0.example.mongodb.net/campuscart?retryWrites=true",
+    )
+    get_settings.cache_clear()
+    try:
+        settings = get_settings()
+        assert settings.mongodb_uri.startswith("mongodb+srv://campuscart:secret@")
+        assert settings.mongodb_db == "campuscart"
+    finally:
+        get_settings.cache_clear()
+
+
+def test_dotted_database_name_falls_back_to_campuscart(monkeypatch: pytest.MonkeyPatch) -> None:
+    from app.config import get_settings
+
+    monkeypatch.setenv("MONGODB_URI", "mongodb+srv://campuscart:secret@cluster0.example.mongodb.net/")
+    monkeypatch.setenv("MONGODB_DB", "cluster0.example.mongodb.net")
+    get_settings.cache_clear()
+    try:
+        settings = get_settings()
+        assert settings.mongodb_uri.startswith("mongodb+srv://")
+        assert settings.mongodb_db == "campuscart"
     finally:
         get_settings.cache_clear()
 

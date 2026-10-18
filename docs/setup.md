@@ -34,6 +34,7 @@ This creates Kaaram & Ko, Campus Brewers, Tanuj Prints, and Potato's Makerspace,
 ## Optional integrations
 - **Gemma 4:** set `GEMMA_API_KEY` (Google AI Studio). Listing drafts and dictation call `generateContent` on `gemma-4-26b-a4b-it` (use `gemma-4-31b-it` if you prefer the larger model). Hosted 26B and 31B are text and image; if a recording is refused, type the note. `GEMMA_BASE_URL` still points drafts at a local OpenAI-compatible server instead.
 - **ElevenLabs:** optional dictation fallback when `ELEVENLABS_API_KEY` is set. Live Google and ElevenLabs calls are not exercised here; tests use fakes.
+- **Backboard:** optional secondary text model when `BACKBOARD_API_KEY` is set. Listing drafts use it when Gemma is unset or that call fails. It does not transcribe audio.
 
 ## UNO Q assistant
 See `edge/uno_q/` and the variables in `.env.example` (API URL, scoped API token from Seller Studio, Telegram token and

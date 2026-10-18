@@ -14,7 +14,7 @@ When to use
 
 Procedure
 1. Preserve seller-only access for listing drafts and transcript-only behavior for speech transcription.
-2. Use hosted Gemma 4 (`generateContent` when `GEMMA_API_KEY` is set). Keep `GEMMA_BASE_URL` as the OpenAI-compatible or Ollama override, and validate JSON drafts server-side.
+2. Use hosted Gemma 4 (`generateContent` when `GEMMA_API_KEY` is set). Keep `GEMMA_BASE_URL` as the OpenAI-compatible or Ollama override. `BACKBOARD_API_KEY` is the secondary text model when Gemma is unset or that call fails. Validate JSON drafts server-side. Audio stays on Gemma, then ElevenLabs.
 3. Only accept price or stock if they appear in the seller's source text; return missing fields as missing.
 4. Keep manual listing creation available and avoid language that implies auto-publish.
 5. Add backend tests and frontend updates that reflect the true feature limits.

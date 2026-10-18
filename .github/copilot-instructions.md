@@ -11,7 +11,7 @@
 - `backend/app/deps.py`: authentication and RBAC dependencies.
 - `backend/app/routers/`: feature routers for auth, stores, products, orders, plans, wallet, chat, ws, reviews, reports, admin, ai, uploads, edge, and me.
 - `backend/app/services/orders.py`: order state machine and atomic inventory updates.
-- `backend/app/services/llm.py`: hosted Gemma 4 (`generateContent` on `gemma-4-26b-a4b-it`) when `GEMMA_API_KEY` is set; `GEMMA_BASE_URL` selects an OpenAI-compatible or Ollama server instead. Validated JSON only.
+- `backend/app/services/llm.py`: hosted Gemma 4 (`generateContent` on `gemma-4-26b-a4b-it`) when `GEMMA_API_KEY` is set; `GEMMA_BASE_URL` selects an OpenAI-compatible or Ollama server instead. `BACKBOARD_API_KEY` is the secondary text model when Gemma is unset or that call fails. Validated JSON only.
 - `backend/app/services/speech.py`: the same Gemma 4 model transcribes audio; ElevenLabs is the fallback when that key is set.
 - `backend/tests/`: pytest coverage using `mongomock-motor`, `httpx` ASGI client, and `starlette` `TestClient` for WebSockets.
 - `frontend/src/components/ui/`: shadcn-style primitives; use React Router, Lucide, and Vitest patterns already established in `frontend/`.

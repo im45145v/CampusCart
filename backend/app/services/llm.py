@@ -2,6 +2,8 @@
 
 The hosted path is Google's Gemini API `generateContent` for `gemma-4-26b-a4b-it`.
 A `GEMMA_BASE_URL` still selects any OpenAI-compatible server (Ollama, vLLM) instead.
+`BACKBOARD_API_KEY` is the secondary text model: it runs when Gemma is unset, and
+when a configured Gemma call fails. Backboard does not accept audio.
 """
 import base64
 import json
@@ -15,6 +17,7 @@ from ..config import get_settings
 
 GOOGLE_GEMMA_ROOT = "https://generativelanguage.googleapis.com/v1beta"
 DEFAULT_GEMMA_MODEL = "gemma-4-26b-a4b-it"
+BACKBOARD_ROOT = "https://app.backboard.io/api"
 
 SYSTEM_PROMPT = """You extract a marketplace listing draft from a student seller's informal note.
 Reply with ONE JSON object and nothing else, using exactly these keys:
@@ -124,13 +127,89 @@ def _gemini_text(payload: dict[str, Any]) -> str:
     return "\n".join(str(t) for t in texts)
 
 
-def get_provider() -> LLMProvider | None:
+class BackboardProvider:
+    """Secondary text model. One message, no stored assistant. Audio is refused."""
+
+    def __init__(
+        self, api_key: str, llm_provider: str, model: str,
+        api_root: str = BACKBOARD_ROOT, timeout: float = 45.0,
+        transport: httpx.AsyncBaseTransport | None = None,
+    ):
+        self.api_key = api_key
+        self.llm_provider = llm_provider or "openai"
+        self.model = model or "gpt-4o"
+        self.api_root = api_root.rstrip("/")
+        self.timeout = timeout
+        self._transport = transport
+
+    async def complete(self, system: str, user: str) -> str:
+        body = {
+            "content": f"{system}\n\n{user}",
+            "llm_provider": self.llm_provider,
+            "model_name": self.model,
+        }
+        try:
+            async with httpx.AsyncClient(timeout=self.timeout, transport=self._transport) as c:
+                r = await c.post(
+                    f"{self.api_root}/threads/messages",
+                    json=body,
+                    headers={"X-API-Key": self.api_key},
+                )
+                r.raise_for_status()
+                data = r.json()
+        except (httpx.HTTPError, ValueError) as e:
+            raise LLMUnavailable(str(e)) from e
+        if not isinstance(data, dict) or not str(data.get("content") or "").strip():
+            raise LLMUnavailable("model returned no text")
+        return str(data["content"])
+
+    async def transcribe(self, data: bytes, mime: str) -> str:
+        del data, mime
+        raise LLMUnavailable("Backboard does not accept audio")
+
+
+class FallbackProvider:
+    """Try the primary model, then the secondary one, for the same prompt."""
+
+    def __init__(self, primary: LLMProvider, secondary: LLMProvider):
+        self.primary = primary
+        self.secondary = secondary
+
+    async def complete(self, system: str, user: str) -> str:
+        try:
+            return await self.primary.complete(system, user)
+        except LLMUnavailable:
+            return await self.secondary.complete(system, user)
+
+    async def transcribe(self, data: bytes, mime: str) -> str:
+        try:
+            return await self.primary.transcribe(data, mime)
+        except LLMUnavailable:
+            return await self.secondary.transcribe(data, mime)
+
+
+def _primary_provider() -> LLMProvider | None:
     s = get_settings()
     if s.gemma_base_url:
         return OpenAICompatibleProvider(s.gemma_base_url, s.gemma_model, s.gemma_api_key)
     if s.gemma_api_key:
         return GoogleGemmaProvider(s.gemma_model or DEFAULT_GEMMA_MODEL, s.gemma_api_key)
     return None
+
+
+def _backboard_provider() -> BackboardProvider | None:
+    s = get_settings()
+    if not s.backboard_api_key:
+        return None
+    return BackboardProvider(s.backboard_api_key, s.backboard_llm_provider, s.backboard_model)
+
+
+def get_provider() -> LLMProvider | None:
+    primary = _primary_provider()
+    secondary = _backboard_provider()
+    if primary and secondary:
+        return FallbackProvider(primary, secondary)
+    return primary or secondary
 
 
 class DraftVariant(BaseModel):
