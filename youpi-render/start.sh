@@ -30,6 +30,7 @@ OBSERVER_API_TOKEN="$(cat "$token_file")"
 export OBSERVER_API_TOKEN
 
 node /opt/render/patch-health.mjs
+node /opt/render/patch-guest.mjs
 
 node apps/payment-api/src/index.js &
 ready=0
