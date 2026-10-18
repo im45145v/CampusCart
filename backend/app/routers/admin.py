@@ -168,3 +168,13 @@ async def wallet_return(entry_id: str, admin: AdminUser, db: DbDep) -> dict[str,
 @router.post("/wallet/{entry_id}/reverse")
 async def wallet_reverse(entry_id: str, admin: AdminUser, db: DbDep) -> dict[str, Any]:
     return out(await wallet_svc.reverse_topup(db, entry_id, admin["_id"]))
+
+
+@router.post("/wallet/{entry_id}/approve")
+async def wallet_approve(entry_id: str, admin: AdminUser, db: DbDep) -> dict[str, Any]:
+    return out(await wallet_svc.approve_topup(db, entry_id, admin["_id"]))
+
+
+@router.post("/wallet/{entry_id}/reject")
+async def wallet_reject(entry_id: str, admin: AdminUser, db: DbDep) -> dict[str, Any]:
+    return out(await wallet_svc.reject_topup(db, entry_id, admin["_id"]))

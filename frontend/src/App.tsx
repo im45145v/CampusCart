@@ -1,11 +1,13 @@
 import { BrowserRouter, Route, Routes } from 'react-router-dom'
 import { Layout, RequireAuth } from '@/components/Layout'
+import { Empty } from '@/components/States'
+import { ToastProvider } from '@/components/Toast'
 import { AuthProvider } from '@/lib/auth'
 import { CartProvider } from '@/lib/cartContext'
 import { ChatProvider } from '@/lib/chat'
 import Account from '@/pages/Account'
 import Admin from '@/pages/Admin'
-import AuthPage from '@/pages/Auth'
+import AuthPage, { MagicLinkPage } from '@/pages/Auth'
 import Browse from '@/pages/Browse'
 import Cart from '@/pages/Cart'
 import Home from '@/pages/Home'
@@ -22,6 +24,7 @@ export default function App() {
       <AuthProvider>
         <CartProvider>
           <ChatProvider>
+            <ToastProvider>
             <Routes>
               <Route element={<Layout />}>
                 <Route index element={<Home />} />
@@ -33,16 +36,18 @@ export default function App() {
                 <Route path="privacy" element={<PrivacyPage />} />
                 <Route path="payments" element={<PaymentsPage />} />
                 <Route path="help" element={<HelpPage />} />
-                <Route path="login" element={<AuthPage mode="login" />} />
-                <Route path="register" element={<AuthPage mode="register" />} />
+                <Route path="login" element={<AuthPage />} />
+                <Route path="register" element={<AuthPage />} />
+                <Route path="login/verify" element={<MagicLinkPage />} />
                 <Route path="orders/:id" element={<RequireAuth><OrderDetail /></RequireAuth>} />
                 <Route path="account" element={<RequireAuth><Account /></RequireAuth>} />
                 <Route path="inbox" element={<RequireAuth><Inbox /></RequireAuth>} />
                 <Route path="seller" element={<Seller />} />
                 <Route path="admin" element={<RequireAuth role="admin"><Admin /></RequireAuth>} />
-                <Route path="*" element={<p className="py-12 text-center text-taupe">Page not found.</p>} />
+                <Route path="*" element={<Empty title="Page not found" />} />
               </Route>
             </Routes>
+            </ToastProvider>
           </ChatProvider>
         </CartProvider>
       </AuthProvider>

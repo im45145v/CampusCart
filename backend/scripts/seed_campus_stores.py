@@ -298,7 +298,7 @@ async def seed() -> None:
     database = await db.connect()
     async with httpx.AsyncClient(base_url=API, timeout=30) as client:
         buyer = await account(client, *BUYER)
-        await account(client, *ADMIN)
+        admin = await account(client, *ADMIN)
         owners = {spec["owner"][1]: await account(client, *spec["owner"]) for spec in STORES}
         store_ids: dict[str, str] = {}
         for spec in STORES:
@@ -352,16 +352,33 @@ async def seed() -> None:
                 published = await client.post(f"/api/products/{created.json()['id']}/publish", headers=headers)
                 published.raise_for_status()
                 print(f"  listed {raw['title']}")
-        loaded = await database.wallet_ledger.find_one({"user_id": buyer["id"], "note": "demo desk load"})
-        if loaded:
+        loaded = await database.wallet_ledger.find_one(
+            {"user_id": buyer["id"], "note": "demo desk load", "reason": "topup"},
+        )
+        if loaded and loaded.get("status") == "posted":
             print("wallet already loaded")
         else:
-            topup = await client.post(
-                "/api/me/wallet/add",
-                headers={"Authorization": "Bearer " + buyer["token"]},
-                json={"amount_minor": 50000, "method": "campus_desk", "note": "demo desk load"},
+            await database.users.update_one(
+                {"_id": admin["id"]}, {"$addToSet": {"roles": "admin"}},
             )
-            topup.raise_for_status()
+            if loaded and loaded.get("status") == "requested":
+                entry_id = loaded["_id"]
+            else:
+                topup = await client.post(
+                    "/api/me/wallet/add",
+                    headers={"Authorization": "Bearer " + buyer["token"]},
+                    json={
+                        "amount_minor": 50000, "method": "upi", "note": "demo desk load",
+                        "transaction_id": "demo-desk-load",
+                    },
+                )
+                topup.raise_for_status()
+                entry_id = topup.json()["id"]
+            approved = await client.post(
+                f"/api/admin/wallet/{entry_id}/approve",
+                headers={"Authorization": "Bearer " + admin["token"]},
+            )
+            approved.raise_for_status()
             print("wallet loaded")
 
     user = await database.users.find_one({"email": ADMIN[1]})

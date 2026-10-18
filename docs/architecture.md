@@ -4,6 +4,7 @@
 React SPA (frontend/)  --REST-->  FastAPI (backend/app) --> MongoDB Atlas
         |                              ^   |
         +------ WebSocket /ws/chat ----+   +--> Gemma 4 (Gemini generateContent, or a local OpenAI-compatible URL)
+                                           +--> Backboard text model (secondary, when Gemma is unset or that call fails)
                                            +--> ElevenLabs speech-to-text (optional fallback)
 UNO Q service (edge/uno_q) --read-only API token--> /api/edge/*
 ```
@@ -22,8 +23,10 @@ UNO Q service (edge/uno_q) --read-only API token--> /api/edge/*
   Printing orders start as `quote_requested`; the seller sends a manual quote and the buyer approves it.
   Payment is whatever that stall enabled: pay on pickup, paid directly to the seller (seller confirms), or campus-wallet credits.
   A stall whose only method is campus wallet is pay upfront. The debit runs when the catalogue total is known, or when the buyer accepts a quote.
-  Campus wallet is an on-campus ledger in `wallet_ledger`: the student records a top-up, staff can reverse it,
-  and payouts are requests the desk marks paid. No UPI or bank payment is verified. Wallet charges are atomic
+  Campus wallet is an on-campus ledger in `wallet_ledger`. A top-up stores the transaction ID the student typed
+  and stays `requested` until an admin approves it; only then does the spendable balance increase. The ID is not
+  proof of payment. Staff can reverse a posted top-up. Payouts leave the balance when requested; the desk marks
+  them paid or returns them. No UPI or bank payment is verified. Wallet charges are atomic
   (`balance >= amount`). Catalogue orders from an active store plan are discounted on the server; quote orders are not.
   Completing a wallet-paid order credits the seller the charged amount (no platform fee). Cancel or reject refunds it once, including a cancel after the seller has accepted.
 - **Plans:** sellers publish up to six memberships (`plans`). Subscribing or renewing debits the campus wallet.
@@ -40,7 +43,8 @@ UNO Q service (edge/uno_q) --read-only API token--> /api/edge/*
   one backend instance a pub/sub layer (e.g. Redis) is required. Chat does not depend on AI/speech/edge integrations;
   if the WebSocket is down the client falls back to the REST send endpoint.
 - **AI:** `app/services/llm.py` turns informal text into a draft with hosted Gemma 4 when `GEMMA_API_KEY` is set.
-  Dictation sends the recording to the same model. Output is validated; price, stock and prep time are
+  `BACKBOARD_API_KEY` is the secondary text model: it drafts when Gemma is unset, and when a Gemma call fails.
+  Dictation sends the recording to Gemma, then ElevenLabs. Backboard does not accept audio. Output is validated; price, stock and prep time are
   dropped unless the number literally appears in the seller's text. The AI never publishes: the seller reviews and
   submits the form, and listings start unpublished. `GEMMA_BASE_URL` keeps the local OpenAI-compatible path.
 - **Edge:** `edge/uno_q` is a separate service using scoped read-only tokens (`cc_...`, stored hashed).

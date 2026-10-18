@@ -27,6 +27,22 @@ services:
         sync: false
       - key: ELEVENLABS_API_KEY
         sync: false
+      - key: ELEVENLABS_STT_MODEL
+        value: scribe_v1
+      - key: BACKBOARD_API_KEY
+        sync: false
+      - key: BACKBOARD_LLM_PROVIDER
+        value: openai
+      - key: BACKBOARD_MODEL
+        value: gpt-4o
+      - key: RESEND_API_KEY
+        sync: false
+      - key: EMAIL_FROM
+        sync: false
+      - key: PUBLIC_WEB_URL
+        sync: false
+      - key: ADMIN_UPI_ID
+        value: im45145v@oksbi
   - type: web
     name: campuscart-web
     runtime: static

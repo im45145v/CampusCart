@@ -22,7 +22,7 @@ export interface Store {
   logo_url: string | null; banner_url?: string | null; tagline?: string; announcement?: string
   theme?: StoreTheme; order_settings?: OrderSettings
   image_urls: string[]; operating_hours: string; pickup_details: string
-  is_open: boolean; status: string; review_reason?: string | null
+  is_open: boolean; status: string; review_reason?: string | null; created_at?: string
   rating_avg: number; rating_count: number
   rating_hist?: Record<string, number>
 }
@@ -100,9 +100,9 @@ export interface Review {
 export interface WalletEntry {
   id: string; user_id?: string; amount_minor: number; direction: 'credit' | 'debit'; reason: string
   note: string; method: string | null; status: string; balance_after_minor: number
-  related_id: string | null; created_at: string
+  related_id: string | null; created_at: string; transaction_id?: string | null
 }
-export interface Wallet { balance_minor: number; entries: WalletEntry[] }
+export interface Wallet { balance_minor: number; upi_id: string; entries: WalletEntry[] }
 export interface Plan {
   id: string; store_id: string; title: string; description: string; price_minor: number
   period: 'week' | 'month'; discount_percent: number; active: boolean; store_name?: string

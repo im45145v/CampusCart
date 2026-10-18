@@ -106,6 +106,20 @@ class LoginIn(Strict):
     password: str = Field(max_length=128)
 
 
+class EmailStartIn(Strict):
+    email: Email
+    name: Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=80)] | None = None
+
+
+class EmailVerifyIn(Strict):
+    email: Email
+    code: Annotated[str, StringConstraints(pattern=r"^\d{6}$")]
+
+
+class MagicLinkIn(Strict):
+    token: Annotated[str, StringConstraints(min_length=20, max_length=200)]
+
+
 class StoreIn(Strict):
     name: Annotated[str, StringConstraints(strip_whitespace=True, min_length=2, max_length=80)]
     description: str = Field(default="", max_length=2000)
@@ -354,8 +368,18 @@ class FundsIn(Strict):
     note: str = Field(default="", max_length=200)
 
 
+TxnId = Annotated[
+    str,
+    StringConstraints(
+        strip_whitespace=True, min_length=4, max_length=64,
+        pattern=r"^[A-Za-z0-9][A-Za-z0-9._:-]*$",
+    ),
+]
+
+
 class AddFundsIn(FundsIn):
-    method: Literal["campus_desk", "reference"] = "campus_desk"
+    method: Literal["campus_desk", "reference", "upi"] = "upi"
+    transaction_id: TxnId
 
 
 class PlanIn(Strict):

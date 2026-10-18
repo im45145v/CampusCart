@@ -9,6 +9,7 @@ import { Empty, ErrorState, Loading, Notice } from '@/components/States'
 import { ImageUpload, OrderSettingsEditor, ThemeEditor } from '@/components/StoreEditors'
 import { StoreBanner } from '@/components/StoreBanner'
 import { Badge, statusTone } from '@/components/ui/badge'
+import { tabClass } from '@/components/ui/tabs'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
 import { Field, Input, Select, Textarea } from '@/components/ui/input'
@@ -37,8 +38,11 @@ function StoreForm({ store, onSaved }: { store?: Store; onSaved: () => void }) {
     order_settings: { ...DEFAULT_ORDER_SETTINGS, ...store?.order_settings },
   })
   const [msg, setMsg] = useState<{ tone: 'ok' | 'bad'; text: string } | null>(null)
+  const [busy, setBusy] = useState(false)
   const save = async (e: FormEvent) => {
     e.preventDefault()
+    if (busy) return
+    setBusy(true)
     try {
       await api(store ? `/api/stores/${store.id}` : '/api/stores', { method: store ? 'PATCH' : 'POST', body: f })
       await refresh()
@@ -46,6 +50,8 @@ function StoreForm({ store, onSaved }: { store?: Store; onSaved: () => void }) {
       onSaved()
     } catch (err) {
       setMsg({ tone: 'bad', text: err instanceof Error ? err.message : 'Save failed' })
+    } finally {
+      setBusy(false)
     }
   }
   const section = 'space-y-3 rounded-2xl border border-line bg-card p-5'
@@ -63,6 +69,7 @@ function StoreForm({ store, onSaved }: { store?: Store; onSaved: () => void }) {
         </div>
         <Field label="Pickup details"><Input value={f.pickup_details} onChange={(e) => setF({ ...f, pickup_details: e.target.value })} placeholder="Hostel B gate, 5–7 pm" /></Field>
         <label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={f.is_open} onChange={(e) => setF({ ...f, is_open: e.target.checked })} /> Open for orders</label>
+        {store && store.status !== 'active' && store.status !== 'suspended' && <p className="text-sm text-taupe">Saving does not approve this stall. Students cannot see it or place an order until an admin approves the application.</p>}
       </section>
       <section className={section}>
         <h3 className="text-lg font-bold">Look and feel</h3>
@@ -77,7 +84,7 @@ function StoreForm({ store, onSaved }: { store?: Store; onSaved: () => void }) {
         <OrderSettingsEditor value={f.order_settings} onChange={(s) => setF({ ...f, order_settings: s })} />
       </section>
       <div className="flex flex-wrap items-center gap-3">
-        <Button type="submit" size="lg">{store ? 'Save changes' : 'Submit for approval'}</Button>
+        <Button type="submit" size="lg" disabled={busy}>{busy ? 'Saving…' : store ? 'Save changes' : 'Submit for approval'}</Button>
         {store && <Link className="text-sm text-terracotta underline" to={`/stores/${store.id}`}>View store page</Link>}
       </div>
       {msg && <Notice tone={msg.tone}>{msg.text}</Notice>}
@@ -152,9 +159,12 @@ function ListingForm({ store, onSaved, incoming }: {
     () => (incoming ? { warnings: incoming.warnings, missing: incoming.missing_fields } : null),
   )
   const [msg, setMsg] = useState<{ tone: 'ok' | 'bad'; text: string } | null>(null)
+  const [busy, setBusy] = useState(false)
 
   const save = async (e: FormEvent) => {
     e.preventDefault()
+    if (busy) return
+    setBusy(true)
     try {
       await api(`/api/stores/${store.id}/products`, {
         method: 'POST',
@@ -182,6 +192,8 @@ function ListingForm({ store, onSaved, incoming }: {
       onSaved()
     } catch (err) {
       setMsg({ tone: 'bad', text: err instanceof Error ? err.message : 'Save failed' })
+    } finally {
+      setBusy(false)
     }
   }
   return (
@@ -221,7 +233,7 @@ function ListingForm({ store, onSaved, incoming }: {
           <div className="space-y-2">
             <p className="text-sm font-medium text-forest">Extras, such as a fried egg</p>
             {extras.map((extra, i) => (
-              <div key={i} className="grid grid-cols-[1fr_7rem_5rem] gap-2">
+              <div key={i} className="grid grid-cols-1 gap-2 sm:grid-cols-[1fr_7rem_5rem]">
                 <Input aria-label="Extra name" placeholder="Fried egg" value={extra.name} onChange={(e) => setExtras(extras.map((row, n) => n === i ? { ...row, name: e.target.value } : row))} />
                 <Input aria-label="Extra price in rupees" type="number" min={0} step="0.01" placeholder="₹" value={extra.price} onChange={(e) => setExtras(extras.map((row, n) => n === i ? { ...row, price: e.target.value } : row))} />
                 <Input aria-label="Maximum quantity" type="number" min={1} max={10} value={extra.max} onChange={(e) => setExtras(extras.map((row, n) => n === i ? { ...row, max: e.target.value } : row))} />
@@ -231,7 +243,7 @@ function ListingForm({ store, onSaved, incoming }: {
           </div>
         )}
         <ImageUpload label="Photo" value={image} onChange={setImage} previewClass="h-24 w-24" />
-        <Button type="submit">Save draft</Button>
+        <Button type="submit" disabled={busy}>{busy ? 'Saving…' : 'Save draft'}</Button>
       </form>
       {msg && <Notice tone={msg.tone}>{msg.text}</Notice>}
     </Card>
@@ -534,6 +546,8 @@ export default function Seller() {
   const [incoming, setIncoming] = useState<Draft | null>(null)
   const [formKey, setFormKey] = useState(0)
   const [idx, setIdx] = useState(0)
+  const [resubmitBusy, setResubmitBusy] = useState(false)
+  const [resubmitErr, setResubmitErr] = useState('')
   const store = stores.data?.[idx]
   const reviews = useFetch<Review[]>(store && tab === 'Reviews' ? `/api/stores/${store.id}/reviews` : null)
   const plans = useFetch<Plan[]>(store && tab === 'Plans' ? `/api/stores/${store.id}/plans` : null)
@@ -544,8 +558,8 @@ export default function Seller() {
   if (stores.loading) return <Loading />
   if (!store) return (
     <div className="mx-auto max-w-xl space-y-4">
-      <h1 className="text-2xl font-extrabold">Apply to open a store</h1>
-      <p className="text-taupe">Tell students what you offer. An admin reviews the application before the store appears on campus. You can prepare listings while you wait.</p>
+      <h1 className="text-2xl font-extrabold">Apply to open a stall</h1>
+      <p className="text-taupe">Tell students what you offer. An admin reviews the application before anyone can see the stall or place an order. Submitting does not approve it. You can prepare listings while you wait.</p>
       <Card><StoreForm onSaved={() => void stores.reload()} /></Card>
     </div>
   )
@@ -560,17 +574,30 @@ export default function Seller() {
           <Button size="sm" onClick={() => setTab('Store')}>Edit look and rules</Button>
         </div>
       </StoreBanner>
-      {store.status === 'pending' && <Notice tone="ok">This store is waiting for an admin. Students cannot see it or order yet.</Notice>}
+      {store.status === 'pending' && <p className="rounded-xl border border-line bg-card px-3 py-2 text-sm">Waiting for approval. Students cannot see this stall or place an order until an admin approves it. You can edit the stall and prepare listings while you wait.</p>}
       {store.status === 'rejected' && (
         <div className="space-y-2">
-          <Notice tone="bad">An admin did not approve this store{store.review_reason ? `: ${store.review_reason}` : ''}. Update it, then submit again.</Notice>
-          <Button size="sm" onClick={async () => { await api(`/api/stores/${store.id}/resubmit`, { method: 'POST' }); await stores.reload() }}>Submit again</Button>
+          <Notice tone="bad">Not approved{store.review_reason ? `: ${store.review_reason.replace(/\.+$/, '')}` : ''}. Update the stall, then send it back to the admin queue. It stays hidden until an admin approves the new application.</Notice>
+          <Button size="sm" disabled={resubmitBusy} onClick={async () => {
+            if (resubmitBusy) return
+            setResubmitBusy(true)
+            setResubmitErr('')
+            try {
+              await api(`/api/stores/${store.id}/resubmit`, { method: 'POST' })
+              await stores.reload()
+            } catch (e) {
+              setResubmitErr(e instanceof Error ? e.message : 'Could not submit again')
+            } finally {
+              setResubmitBusy(false)
+            }
+          }}>{resubmitBusy ? 'Submitting…' : 'Submit again'}</Button>
+          {resubmitErr && <Notice tone="bad">{resubmitErr}</Notice>}
         </div>
       )}
       {stores.data && stores.data.length > 1 && <Select aria-label="Choose store" className="w-48" value={idx} onChange={(e) => setIdx(Number(e.target.value))}>{stores.data.map((s, i) => <option key={s.id} value={i}>{s.name}</option>)}</Select>}
-      <div role="tablist" className="flex flex-wrap gap-1 border-b border-line">
-        {TABS.map((t) => <button key={t} role="tab" aria-selected={tab === t} onClick={() => setTab(t)} className={cn('rounded-t-lg px-4 py-2 text-sm font-semibold', tab === t ? 'bg-forest text-white' : 'text-forest hover:bg-forest/10')}>{t === 'Orders' && store.category === 'printing' ? 'Print queue' : t === 'Orders' && store.category === 'lending' ? 'Loans' : t}</button>)}
-        <Link className="ml-auto px-3 py-2 text-sm text-terracotta underline" to="/inbox">Messages</Link>
+      <div role="tablist" aria-label="Seller studio" className="flex gap-2 overflow-x-auto pb-1">
+        {TABS.map((t) => <button key={t} type="button" role="tab" aria-selected={tab === t} onClick={() => setTab(t)} className={tabClass(tab === t)}>{t === 'Orders' && store.category === 'printing' ? 'Print queue' : t === 'Orders' && store.category === 'lending' ? 'Loans' : t}</button>)}
+        <Link className="ml-auto inline-flex min-h-11 shrink-0 items-center px-3 text-sm font-medium text-terracotta underline-offset-2 hover:underline" to="/inbox">Messages</Link>
       </div>
       {tab === 'Overview' && <Overview />}
       {tab === 'Listings' && <Listings store={store} incoming={incoming} formKey={formKey} onDrafted={(draft) => { setIncoming(draft); setFormKey((n) => n + 1); setTab('Listings') }} />}

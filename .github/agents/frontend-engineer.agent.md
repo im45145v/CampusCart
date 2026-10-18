@@ -11,7 +11,7 @@ tools: ["read", "search", "edit", "execute"]
 
 ## Scope
 - Work in `frontend/src/`, especially routes, feature components, and `frontend/src/components/ui/` primitives.
-- Preserve the design system: background `#F7F4ED`, cards `#FFFFFF`, primary `#C65D3A`, headings/nav `#263D32`, Manrope headings, and Inter body text.
+- Preserve the design system: background `#F7F5EF`, cards `#FFFFFF`, primary teal `#20B8A5`, hover `#159786`, midnight nav and headings `#142B3B`, gold `#FFC857` for small highlights, text `#182B36`, Manrope headings, and Inter body text. Teal buttons use midnight text. Stall themes may recolor a stall’s own pages.
 - Reflect backend API contracts accurately, especially for chat sequencing, order statuses, and AI draft limitations.
 
 ## Boundaries

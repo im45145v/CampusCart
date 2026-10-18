@@ -3,6 +3,7 @@ import { Link, useParams } from 'react-router-dom'
 import { ReviewCard, ReviewForm } from '@/components/Reviews'
 import { MessageButton, ReportButton } from '@/components/ContactButtons'
 import { Empty, ErrorState, Loading, Notice } from '@/components/States'
+import { useToast } from '@/components/Toast'
 import { Badge, statusTone } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
@@ -53,7 +54,7 @@ export function OrderList() {
       {data.map((o) => (
         <li key={o.id}>
           <Link to={`/orders/${o.id}`}>
-            <Card className="flex items-center justify-between hover:shadow-md">
+            <Card className="flex flex-wrap items-center justify-between gap-3 transition-[transform,box-shadow] duration-200 hover:-translate-y-0.5 hover:shadow-md">
               <div><p className="font-semibold">{o.store_name}</p><p className="text-sm text-taupe">{formatTime(o.created_at)} · {o.items.length} item(s)</p><OrderMeta order={o} /></div>
               <div className="text-right"><Badge tone={statusTone(o.status)}>{statusLabel(o.status)}</Badge><p className="mt-1 font-semibold">{o.total_minor ? formatMoney(o.total_minor) : 'Awaiting quote'}</p></div>
             </Card>
@@ -95,6 +96,8 @@ export function printSummary(job: NonNullable<OrderLine['print']>): string {
 
 export function OrderActions({ order, role, onChange }: { order: Order; role: 'buyer' | 'seller'; onChange: (o: Order) => void }) {
   const [error, setError] = useState('')
+  const [busy, setBusy] = useState(false)
+  const toast = useToast()
   const [quote, setQuote] = useState('')
   const next = (role === 'seller' ? SELLER_NEXT : BUYER_NEXT)[order.status] ?? []
   const printing = role === 'seller' && order.items.some((line) => line.print)
@@ -106,30 +109,57 @@ export function OrderActions({ order, role, onChange }: { order: Order; role: 'b
     return ACTION_LABEL[status]
   }
   const act = async (status: string) => {
+    if (busy) return
     setError('')
+    setBusy(true)
     try {
       onChange(await api<Order>(`/api/orders/${order.id}/status`, { method: 'POST', body: { status } }))
+      toast('ok', `Order updated: ${statusLabel(status)}`)
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Failed')
+      const message = e instanceof Error ? e.message : 'Failed'
+      setError(message)
+      toast('bad', message)
+    } finally {
+      setBusy(false)
     }
   }
   const sendQuote = async () => {
+    if (busy) return
+    setBusy(true)
     try {
       onChange(await api<Order>(`/api/orders/${order.id}/quote`, { method: 'POST', body: { total_minor: rupeesToMinor(quote) } }))
       setQuote('')
+      toast('ok', 'Quote sent')
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Failed')
+      const message = e instanceof Error ? e.message : 'Failed'
+      setError(message)
+      toast('bad', message)
+    } finally {
+      setBusy(false)
     }
   }
-  const confirmPayment = async () => onChange(await api<Order>(`/api/orders/${order.id}/confirm-payment`, { method: 'POST' }))
+  const confirmPayment = async () => {
+    if (busy) return
+    setBusy(true)
+    try {
+      onChange(await api<Order>(`/api/orders/${order.id}/confirm-payment`, { method: 'POST' }))
+      toast('ok', 'Payment marked as received')
+    } catch (e) {
+      const message = e instanceof Error ? e.message : 'Failed'
+      setError(message)
+      toast('bad', message)
+    } finally {
+      setBusy(false)
+    }
+  }
   return (
     <div className="space-y-3">
       <div className="flex flex-wrap gap-2">
-        {next.map((s) => <Button key={s} variant={s === 'rejected' || s === 'cancelled' ? 'secondary' : 'primary'} onClick={() => act(s)}>{actionLabel(s)}</Button>)}
-        {role === 'seller' && order.payment_status === 'unpaid' && !['rejected', 'cancelled'].includes(order.status) && <Button variant="secondary" onClick={confirmPayment}>I received payment</Button>}
+        {next.map((s) => <Button key={s} disabled={busy} variant={s === 'rejected' || s === 'cancelled' ? 'secondary' : 'primary'} onClick={() => act(s)}>{actionLabel(s)}</Button>)}
+        {role === 'seller' && order.payment_status === 'unpaid' && !['rejected', 'cancelled'].includes(order.status) && <Button variant="secondary" disabled={busy} onClick={confirmPayment}>I received payment</Button>}
       </div>
       {role === 'seller' && ['quote_requested', 'quoted'].includes(order.status) && (
-        <div className="flex items-end gap-2"><Field label="Quote total (₹)"><Input type="number" min={0} value={quote} onChange={(e) => setQuote(e.target.value)} /></Field><Button disabled={!quote} onClick={sendQuote}>Send quote</Button></div>
+        <div className="flex flex-wrap items-end gap-2"><Field label="Quote total (₹)"><Input type="number" min={0} value={quote} onChange={(e) => setQuote(e.target.value)} /></Field><Button disabled={busy || !quote} onClick={sendQuote}>Send quote</Button></div>
       )}
       {error && <Notice tone="bad">{error}</Notice>}
     </div>

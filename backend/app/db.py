@@ -50,6 +50,11 @@ async def ensure_indexes(db: Database) -> None:
     await db.reviews.create_index("store_id")
     await db.wallet_ledger.create_index([("user_id", 1), ("created_at", -1)])
     await db.wallet_ledger.create_index([("reason", 1), ("status", 1), ("created_at", -1)])
+    await db.wallet_ledger.create_index(
+        "transaction_key",
+        unique=True,
+        partialFilterExpression={"transaction_key": {"$type": "string"}},
+    )
     await db.plans.create_index([("store_id", 1), ("active", 1)])
     await db.subscriptions.create_index("active_key", unique=True, sparse=True)
     await db.subscriptions.create_index([("buyer_id", 1), ("created_at", -1)])
@@ -62,3 +67,6 @@ async def ensure_indexes(db: Database) -> None:
     await db.audit_logs.create_index([("created_at", -1)])
     await db.ws_tickets.create_index("created_at", expireAfterSeconds=120)
     await db.api_tokens.create_index("token_hash", unique=True)
+    await db.login_challenges.create_index("email")
+    await db.login_challenges.create_index("token_hash", unique=True)
+    await db.login_challenges.create_index("expires_at", expireAfterSeconds=0)

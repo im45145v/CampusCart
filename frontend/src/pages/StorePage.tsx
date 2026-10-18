@@ -1,4 +1,5 @@
 import { Clock, Heart, MapPin, Megaphone, ShoppingBag, Star, Timer } from 'lucide-react'
+import { useState } from 'react'
 import { useParams } from 'react-router-dom'
 import { MessageButton, ReportButton } from '@/components/ContactButtons'
 import { ProductCard } from '@/components/Cards'
@@ -6,6 +7,7 @@ import { PlanCards } from '@/components/Memberships'
 import { OfferList } from '@/components/Vouchers'
 import { RatingBars, ReviewCard } from '@/components/Reviews'
 import { Empty, ErrorState, Loading } from '@/components/States'
+import { useToast } from '@/components/Toast'
 import { StoreBanner } from '@/components/StoreBanner'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -13,13 +15,15 @@ import { Card } from '@/components/ui/card'
 import { api } from '@/lib/api'
 import { useAuth } from '@/lib/auth'
 import { themeStyle } from '@/lib/theme'
-import { formatMoney, paysUpfront } from '@/lib/utils'
+import { cn, formatMoney, paysUpfront } from '@/lib/utils'
 import { useFetch } from '@/lib/useFetch'
 import type { OrderOptions, Plan, Product, Review, Store, Subscription, Voucher } from '@/lib/types'
 
 export default function StorePage() {
   const { id = '' } = useParams()
   const { user } = useAuth()
+  const toast = useToast()
+  const [pulse, setPulse] = useState(false)
   const store = useFetch<Store>(`/api/stores/${id}`)
   const products = useFetch<Product[]>(`/api/stores/${id}/products`)
   const reviews = useFetch<Review[]>(`/api/stores/${id}/reviews`)
@@ -35,8 +39,15 @@ export default function StorePage() {
   const s = store.data
   const o = options.data
   const toggleSave = async () => {
-    await api(`/api/me/saved-stores/${id}`, { method: isSaved ? 'DELETE' : 'PUT' })
-    void saved.reload()
+    const saving = !isSaved
+    try {
+      await api(`/api/me/saved-stores/${id}`, { method: saving ? 'PUT' : 'DELETE' })
+      if (saving) setPulse(true)
+      toast('ok', saving ? 'Stall saved' : 'Removed from saved stalls')
+      void saved.reload()
+    } catch (e) {
+      toast('bad', e instanceof Error ? e.message : 'Could not update saved stalls')
+    }
   }
   return (
     <div className="space-y-8 rounded-3xl bg-ivory p-3 sm:p-5" style={themeStyle(s.theme)}>
@@ -46,7 +57,7 @@ export default function StorePage() {
       <StoreBanner store={s}>
         <div className="flex flex-wrap items-center gap-2 pt-3">
           {user && user.id !== s.owner_id && <MessageButton storeId={s.id} />}
-          {user && <Button variant="secondary" onClick={toggleSave} aria-pressed={isSaved}><Heart className={`h-4 w-4 ${isSaved ? 'fill-terracotta text-terracotta' : ''}`} aria-hidden /> {isSaved ? 'Saved' : 'Save store'}</Button>}
+          {user && <Button variant="secondary" onClick={() => void toggleSave()} aria-pressed={isSaved}><Heart onAnimationEnd={() => setPulse(false)} className={cn('h-4 w-4', isSaved && 'fill-terracotta text-terracotta', pulse && 'animate-heart')} aria-hidden /> {isSaved ? 'Saved' : 'Save stall'}</Button>}
           <ReportButton targetType="store" targetId={s.id} />
         </div>
       </StoreBanner>
@@ -71,25 +82,25 @@ export default function StorePage() {
         )}
       </Card>
       <section aria-labelledby="sp">
-        <h2 id="sp" className="mb-3 text-xl font-bold">Menu & listings</h2>
+        <h2 id="sp" className="mb-4 text-lg font-bold">Menu and listings</h2>
         {products.loading ? <Loading /> : products.error ? <ErrorState message={products.error} onRetry={products.reload} /> : products.data?.length ? (
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">{products.data.map((p) => <ProductCard key={p.id} product={p} />)}</div>
         ) : <Empty title="This store has not published anything yet" />}
       </section>
       {!!offers.data?.length && (
         <section aria-labelledby="offers">
-          <h2 id="offers" className="mb-3 text-xl font-bold">Offers</h2>
+          <h2 id="offers" className="mb-4 text-lg font-bold">Offers</h2>
           <OfferList vouchers={offers.data} />
         </section>
       )}
       {plans.data?.some((p) => p.active) && (
         <section aria-labelledby="plans">
-          <h2 id="plans" className="mb-3 text-xl font-bold">Memberships</h2>
+          <h2 id="plans" className="mb-4 text-lg font-bold">Memberships</h2>
           <PlanCards plans={(plans.data ?? []).filter((p) => p.active)} mine={(subs.data ?? []).filter((sub) => sub.store_id === id)} onChanged={() => { void subs.reload(); void plans.reload() }} />
         </section>
       )}
       <section aria-labelledby="sr">
-        <h2 id="sr" className="mb-3 text-xl font-bold">Reviews</h2>
+        <h2 id="sr" className="mb-4 text-lg font-bold">Reviews</h2>
         <RatingBars hist={s.rating_hist} count={s.rating_count} />
         {reviews.data?.length ? (
           <ul className="space-y-3">{reviews.data.map((r) => <li key={r.id}><ReviewCard review={r} /></li>)}</ul>

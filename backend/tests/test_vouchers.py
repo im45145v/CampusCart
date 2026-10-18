@@ -18,7 +18,7 @@ def _code(code: str, **extra: Any) -> dict[str, Any]:
 
 
 async def test_amount_code_min_and_wallet_charge(
-    client: httpx.AsyncClient, seller: Actor, buyer: Actor, store: dict[str, Any]
+    client: httpx.AsyncClient, seller: Actor, buyer: Actor, store: dict[str, Any], database: Any
 ) -> None:
     created = await client.post(
         f"/api/stores/{store['id']}/vouchers", headers=seller.headers,
@@ -48,7 +48,7 @@ async def test_amount_code_min_and_wallet_charge(
     assert preview.status_code == 200, preview.text
     assert preview.json()["discount_minor"] == 500
     assert preview.json()["payable_minor"] == 3500
-    await _wallet(client, buyer, 40_00)
+    await _wallet(client, buyer, 40_00, database=database)
     placed = await client.post(
         "/api/orders", headers=buyer.headers,
         json={"store_id": store["id"], "payment_method": "campus_wallet", "voucher_code": "save5", "items": items},
@@ -132,7 +132,7 @@ async def test_conditions_campus_code_and_membership(
         json={"title": "Regulars", "price_minor": 1000, "discount_percent": 10},
     )
     assert plan.status_code == 201, plan.text
-    await _wallet(client, buyer, 20_00)
+    await _wallet(client, buyer, 20_00, database=database)
     assert (await client.post(f"/api/plans/{plan.json()['id']}/subscribe", headers=buyer.headers)).status_code == 201
     member = await client.post(
         "/api/vouchers/preview", headers=buyer.headers,
@@ -169,7 +169,8 @@ async def test_conditions_campus_code_and_membership(
 
 
 async def test_used_up_quote_and_pause(
-    client: httpx.AsyncClient, seller: Actor, buyer: Actor, other: Actor, store: dict[str, Any]
+    client: httpx.AsyncClient, seller: Actor, buyer: Actor, other: Actor, store: dict[str, Any],
+    database: Any,
 ) -> None:
     assert (await client.post(
         f"/api/stores/{store['id']}/vouchers", headers=seller.headers,
@@ -185,8 +186,8 @@ async def test_used_up_quote_and_pause(
         f"/api/stores/{store['id']}", headers=seller.headers,
         json={"order_settings": {"payment_options": ["pay_on_pickup", "campus_wallet"]}},
     )
-    await _wallet(client, buyer, 20_00)
-    await _wallet(client, other, 20_00)
+    await _wallet(client, buyer, 20_00, database=database)
+    await _wallet(client, other, 20_00, database=database)
     taken = await client.post(
         "/api/orders", headers=buyer.headers,
         json={"store_id": store["id"], "payment_method": "campus_wallet", "voucher_code": "once",
