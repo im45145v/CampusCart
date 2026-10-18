@@ -15,7 +15,7 @@ Quick start: see [docs/setup.md](docs/setup.md). Deploy checklist: [docs/deploy.
 About two minutes, after the API is up and `python -m scripts.seed_campus_stores` has been run from `backend/`.
 
 1. Open the site. The first screen is for the student running the stall: Gemma 4 drafts a listing from their words, and it never invents a price or publishes.
-2. Log in as `caram.store@campus.test` / `CaramStore1`. In Seller Studio, choose **Run the sample note**. With `GEMMA_API_KEY` set, the listing form fills and stays a draft. Without the key, the studio says to type the listing.
+2. Log in as `caram.store@campus.test` / `CaramStore1` (password option on the sign-in page; those demo addresses do not receive email). In Seller Studio, choose **Run the sample note**. With `GEMMA_API_KEY` set, the listing form fills and stays a draft. Without the key, the studio says to type the listing.
 3. Log out. Log in as `student.buyer@campus.test` / `CampusBuyer1`. The seed loads ₹500 of campus-wallet credit once. Open Kaaram & Ko, add garlic rice with a fried egg, check code `RICE20`, pay with the campus wallet, pick a slot, and answer hostel and spice.
 4. For print, open Tanuj Prints → Document printing, upload a one-page image or PDF, and add it to the cart. That stall is pay upfront, so checkout takes campus credits and does not offer cash. Check code `INKWALLET`. The server prices the file. Uploaded files live on the API disk, which disappears when a Render instance restarts.
 5. Log back in as the Kaaram seller and accept the order on the Orders tab. Log in as Tanuj Prints (`thanooj.prints@campus.test` / `ThanoojPrint1`) and open Print queue: the packet name, the spec, and the file are on the job, with urgent jobs first.

@@ -6,7 +6,7 @@ routers in `backend/app/routers/` are the source of truth.
 
 | Area | Endpoints |
 |---|---|
-| Auth | `POST /auth/register`, `POST /auth/login`, `GET /auth/me` (rate limited) |
+| Auth | `POST /auth/email/start`, `POST /auth/email/verify`, `POST /auth/email/verify-link`, `POST /auth/register`, `POST /auth/login`, `GET /auth/me` (rate limited) |
 | Home | `GET /home`, `GET /health` |
 | Stores | `GET /stores`, `POST /stores` (starts `pending`), `POST /stores/{id}/resubmit`, `GET /stores/mine`, `GET/PATCH /stores/{id}`, `GET /stores/{id}/order-options`, `GET /stores/{id}/reviews` |
 | Products | `GET /products` (q, category, store, price, availability), `POST /stores/{id}/products` (draft), `GET/PATCH /products/{id}`, `POST /products/{id}/publish`, `/unpublish` |
@@ -21,6 +21,8 @@ routers in `backend/app/routers/` are the source of truth.
 | AI | `POST /ai/listing-draft` and `POST /ai/transcribe` use hosted Gemma 4 when `GEMMA_API_KEY` is set (503 means type the listing) |
 | Uploads | `POST /uploads` (seller; PNG/JPEG/WebP), `POST /uploads/documents` (any logged-in user; PDF or image, page count returned) |
 | Edge | `GET /edge/pending-orders`, `/edge/orders/{id}/summary`, `/edge/low-stock`, `/edge/today-sales`, `/edge/products/availability` (API token only) |
+
+Email sign-in: `POST /auth/email/start` with `{email, name?}` returns `{needs_name: true}` when the address is new and no name was sent. Otherwise it stores a hashed code and link. In development, with no `RESEND_API_KEY`, the response includes `dev_code` and `dev_token`. Production returns `{sent: true}` only. `POST /auth/email/verify` takes `{email, code}`. `POST /auth/email/verify-link` takes `{token}`. Both return the same `{token, user}` shape as password login. A code allows 5 guesses and expires after 10 minutes.
 
 Order creation: `{store_id, items:[{product_id, variant_id?, quantity}], fulfillment, payment_method, note, ...}`.
 Prices and status in the body are rejected. Illegal status transitions return 409.

@@ -44,5 +44,5 @@ Follow [deploy.md](deploy.md). `render.yaml` defines the API web service and the
 
 ## Known limitations
 - Chat connections and rate limits are per-process; multi-instance needs a shared pub/sub (Redis) and limiter.
-- A lending store holds a piece while it is borrowed and puts it back when the owner marks the order completed. There is no deposit ledger: the price is the borrow fee. Karma, a full rental calendar, push notifications, and email are not implemented.
+- A lending store holds a piece while it is borrowed and puts it back when the owner marks the order completed. There is no deposit ledger: the price is the borrow fee. Karma, a full rental calendar, and push notifications are not implemented. Sign-in email is sent only when `RESEND_API_KEY` is set.
 - Not verified: real MongoDB Atlas, a live Gemma 4 or ElevenLabs call on this machine (the studio reports that the assistant is not configured until `GEMMA_API_KEY` is set), Telegram/MCP, UNO Q hardware, cross-browser UI.

@@ -7,7 +7,7 @@
 ## Repo layout
 - `backend/app/config.py`: settings and environment variables via `pydantic-settings`.
 - `backend/app/db.py`: Motor client setup and MongoDB indexes.
-- `backend/app/security.py`: bcrypt password hashing and JWT access tokens.
+- `backend/app/security.py`: bcrypt password hashing, SHA-256 email sign-in codes, and JWT access tokens.
 - `backend/app/deps.py`: authentication and RBAC dependencies.
 - `backend/app/routers/`: feature routers for auth, stores, products, orders, plans, wallet, chat, ws, reviews, reports, admin, ai, uploads, edge, and me.
 - `backend/app/services/orders.py`: order state machine and atomic inventory updates.

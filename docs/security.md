@@ -1,6 +1,6 @@
 # Security notes
 
-- Passwords: bcrypt. JWT secret from `JWT_SECRET`; the app refuses to start in production with the dev default.
+- Sign-in: email a 6-digit code and a one-time link (10 minutes, 5 guesses, SHA-256 at rest, single use). Production sends them with Resend and never returns the code. Development without `RESEND_API_KEY` returns `dev_code` for local use. Password login remains for seeded accounts: bcrypt, and accounts created by email have no password hash. JWT secret from `JWT_SECRET`; the app refuses to start in production with the dev default.
 - RBAC and ownership are checked server-side on every route. Non-parties get 404 for orders and conversations.
 - Never trusted from clients: prices, totals, order status, sender id, roles (request models forbid extra fields). A payment method is accepted only when that stall enabled it.
 - Search input is regex-escaped. Uploads are content-sniffed, size-limited and renamed with random ids.

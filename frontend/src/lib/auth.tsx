@@ -2,16 +2,29 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useState, t
 import { api, tokenStore } from './api'
 import type { User } from './types'
 
+export interface EmailStartResult {
+  sent?: boolean
+  needs_name?: boolean
+  dev_code?: string
+}
+
 interface AuthState {
   user: User | null
   loading: boolean
+  requestEmailCode: (email: string, name?: string) => Promise<EmailStartResult>
+  verifyEmailCode: (email: string, code: string) => Promise<void>
+  verifyMagicLink: (token: string) => Promise<void>
   login: (email: string, password: string) => Promise<void>
-  register: (name: string, email: string, password: string) => Promise<void>
   logout: () => void
   refresh: () => Promise<void>
 }
 
 const AuthContext = createContext<AuthState | null>(null)
+
+function adopt(setUser: (user: User) => void, result: { token: string; user: User }) {
+  tokenStore.set(result.token)
+  setUser(result.user)
+}
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null)
@@ -42,15 +55,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       user,
       loading,
       refresh,
-      login: async (email, password) => {
-        const r = await api<{ token: string; user: User }>('/api/auth/login', { method: 'POST', body: { email, password } })
-        tokenStore.set(r.token)
-        setUser(r.user)
+      requestEmailCode: (email, name) =>
+        api<EmailStartResult>('/api/auth/email/start', {
+          method: 'POST',
+          body: { email, ...(name ? { name } : {}) },
+        }),
+      verifyEmailCode: async (email, code) => {
+        adopt(setUser, await api('/api/auth/email/verify', { method: 'POST', body: { email, code } }))
       },
-      register: async (name, email, password) => {
-        const r = await api<{ token: string; user: User }>('/api/auth/register', { method: 'POST', body: { name, email, password } })
-        tokenStore.set(r.token)
-        setUser(r.user)
+      verifyMagicLink: async (token) => {
+        adopt(setUser, await api('/api/auth/email/verify-link', { method: 'POST', body: { token } }))
+      },
+      login: async (email, password) => {
+        adopt(setUser, await api('/api/auth/login', { method: 'POST', body: { email, password } }))
       },
       logout: () => {
         tokenStore.clear()

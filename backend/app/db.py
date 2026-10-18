@@ -62,3 +62,6 @@ async def ensure_indexes(db: Database) -> None:
     await db.audit_logs.create_index([("created_at", -1)])
     await db.ws_tickets.create_index("created_at", expireAfterSeconds=120)
     await db.api_tokens.create_index("token_hash", unique=True)
+    await db.login_challenges.create_index("email")
+    await db.login_challenges.create_index("token_hash", unique=True)
+    await db.login_challenges.create_index("expires_at", expireAfterSeconds=0)

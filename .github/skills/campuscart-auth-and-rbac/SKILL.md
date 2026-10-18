@@ -14,7 +14,7 @@ When to use
 
 Procedure
 1. Start with `backend/app/security.py`, `backend/app/deps.py`, and the owning router.
-2. Confirm bcrypt hashing, JWT access token flow, and role checks remain enforced through dependencies instead of inline shortcuts.
+2. Confirm bcrypt hashing, JWT access token flow, and role checks remain enforced through dependencies instead of inline shortcuts. Email codes and magic links are SHA-256, single-use, and short-lived; production must not return the code.
 3. Preserve seller-only AI draft access, admin-only routes, single-use 60s WebSocket tickets, and scoped `cc_...` seller tokens.
 4. Add backend tests for allowed and denied cases.
 5. Check whether frontend messaging or edge behavior needs updates.

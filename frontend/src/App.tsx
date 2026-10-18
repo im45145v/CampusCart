@@ -5,7 +5,7 @@ import { CartProvider } from '@/lib/cartContext'
 import { ChatProvider } from '@/lib/chat'
 import Account from '@/pages/Account'
 import Admin from '@/pages/Admin'
-import AuthPage from '@/pages/Auth'
+import AuthPage, { MagicLinkPage } from '@/pages/Auth'
 import Browse from '@/pages/Browse'
 import Cart from '@/pages/Cart'
 import Home from '@/pages/Home'
@@ -33,8 +33,9 @@ export default function App() {
                 <Route path="privacy" element={<PrivacyPage />} />
                 <Route path="payments" element={<PaymentsPage />} />
                 <Route path="help" element={<HelpPage />} />
-                <Route path="login" element={<AuthPage mode="login" />} />
-                <Route path="register" element={<AuthPage mode="register" />} />
+                <Route path="login" element={<AuthPage />} />
+                <Route path="register" element={<AuthPage />} />
+                <Route path="login/verify" element={<MagicLinkPage />} />
                 <Route path="orders/:id" element={<RequireAuth><OrderDetail /></RequireAuth>} />
                 <Route path="account" element={<RequireAuth><Account /></RequireAuth>} />
                 <Route path="inbox" element={<RequireAuth><Inbox /></RequireAuth>} />

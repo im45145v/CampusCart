@@ -29,6 +29,14 @@ class Settings(BaseSettings):
     elevenlabs_api_key: str = ""
     elevenlabs_stt_model: str = "scribe_v1"
 
+    # Email sign-in. Empty RESEND_API_KEY in development returns the code to the caller.
+    # Production refuses to send until Resend, a from address, and an https site URL are set.
+    resend_api_key: str = ""
+    email_from: str = ""
+    public_web_url: str = "http://localhost:5173"
+    otp_ttl_minutes: int = 10
+    otp_max_attempts: int = 5
+
     def validate_for_runtime(self) -> None:
         if self.environment == "production" and self.jwt_secret.startswith("dev-insecure"):
             raise RuntimeError("Set JWT_SECRET to a long random value in production")
