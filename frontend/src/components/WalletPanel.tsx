@@ -18,6 +18,23 @@ const REASON: Record<string, string> = {
   withdrawal_return: 'Payout returned',
 }
 
+function openCheckout(url: string, popup: Window | null): boolean {
+  let parsed: URL
+  try {
+    parsed = new URL(url)
+  } catch {
+    return false
+  }
+  if (parsed.protocol !== 'https:' && parsed.protocol !== 'http:') return false
+  if (popup && !popup.closed) {
+    popup.location.replace(parsed.href)
+    popup.opener = null
+    return true
+  }
+  window.location.assign(parsed.href)
+  return true
+}
+
 const STATUS: Record<string, string> = {
   requested: 'Requested', posted: 'In balance', paid: 'Paid', returned: 'Returned',
   reversed: 'Reversed', rejected: 'Declined', expired: 'Expired',
@@ -57,6 +74,8 @@ function MoneyForm({
     setMsg(null)
     setBusy(true)
     const amount_minor = rupeesToMinor(amount)
+    // Open during the click. A window opened after the request returns is blocked.
+    const popup = kind === 'add' ? window.open('', '_blank') : null
     try {
       if (kind === 'remove') {
         const entry = await api<WalletEntry>('/api/me/wallet/remove', {
@@ -71,15 +90,22 @@ function MoneyForm({
         const entry = await api<WalletCheckout>('/api/me/wallet/checkout', {
           method: 'POST', body: { amount_minor },
         })
-        setCheckoutUrl(entry.checkout_url ?? null)
-        const text = entry.checkout_url
-          ? `Checkout opened for ${formatMoney(entry.amount_minor)}. Credits appear here only after YouPI confirms the payment.`
-          : 'YouPI did not return a checkout link.'
-        setMsg({ tone: entry.checkout_url ? 'ok' : 'bad', text })
-        toast(entry.checkout_url ? 'ok' : 'bad', text)
+        const url = entry.checkout_url ?? null
+        setCheckoutUrl(url)
+        if (!url || !openCheckout(url, popup)) {
+          popup?.close()
+          const text = 'YouPI did not return a checkout link.'
+          setMsg({ tone: 'bad', text })
+          toast('bad', text)
+        } else {
+          const text = `Payment page opened for ${formatMoney(entry.amount_minor)}. Credits appear here only after YouPI confirms the payment.`
+          setMsg({ tone: 'ok', text })
+          toast('ok', text)
+        }
       }
       onDone()
     } catch (err) {
+      popup?.close()
       const text = err instanceof Error ? err.message : 'Could not update the wallet'
       setMsg({ tone: 'bad', text })
       toast('bad', text)
@@ -129,7 +155,7 @@ function MoneyForm({
 export function WalletPanel() {
   const wallet = useFetch<Wallet>('/api/me/wallet')
   const { refresh } = useAuth()
-  const reload = () => { void wallet.reload(); void refresh() }
+  const reload = () => { void wallet.reloadQuiet(); void refresh() }
   const pendingMinor = (wallet.data?.entries ?? [])
     .filter((e) => e.reason === 'topup' && e.status === 'requested')
     .reduce((sum, e) => sum + e.amount_minor, 0)
