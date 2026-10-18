@@ -197,12 +197,26 @@ RETIRED_LENDERS = (
 
 
 async def account(client: httpx.AsyncClient, name: str, email: str, password: str) -> dict[str, str]:
-    r = await client.post("/api/auth/login", json={"email": email, "password": password})
-    if r.status_code == 401:
-        r = await client.post("/api/auth/register", json={"name": name, "email": email, "password": password})
-    r.raise_for_status()
-    body = r.json()
-    return {"token": body["token"], "id": body["user"]["id"]}
+    """Issue a token from the database. Login is rate-limited, and this seed calls it from the API host."""
+    del client
+    from app.security import create_access_token, hash_password
+    from app.util import new_id, now
+
+    database = await db.connect()
+    user = await database.users.find_one({"email": email})
+    if user is None:
+        user = {
+            "_id": new_id(), "name": name, "email": email, "roles": ["buyer"],
+            "is_active": True, "saved_stores": [], "karma_balance": 0,
+            "wallet_balance_minor": 0, "created_at": now(),
+            "password_hash": hash_password(password),
+        }
+        await database.users.insert_one(user)
+    elif not user.get("password_hash"):
+        await database.users.update_one(
+            {"_id": user["_id"]}, {"$set": {"password_hash": hash_password(password), "name": name}},
+        )
+    return {"token": create_access_token(str(user["_id"])), "id": str(user["_id"])}
 
 
 ADDONS = {

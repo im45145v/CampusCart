@@ -41,15 +41,13 @@ async def _seed_demo() -> None:
     from scripts import seed_campus_stores as seed
 
     seed.API = os.environ["CAMPUSCART_SEED_API"]
-    for attempt in range(8):
-        await asyncio.sleep(2)
-        try:
-            await seed.seed()
-        except Exception:
-            log.exception("demo seed attempt %s failed", attempt + 1)
-            continue
-        log.info("demo catalogue seeded")
+    await asyncio.sleep(2)
+    try:
+        await seed.seed()
+    except Exception:
+        log.exception("demo seed failed")
         return
+    log.info("demo catalogue seeded")
     log.error("demo catalogue was not seeded")
 
 
