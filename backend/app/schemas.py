@@ -236,22 +236,6 @@ class PrintJobIn(Strict):
     note: str = Field(default="", max_length=300)
 
 
-class AddonPick(Strict):
-    id: str
-    quantity: int = Field(ge=1, le=10)
-
-
-class PrintJobIn(Strict):
-    file_url: Annotated[str, StringConstraints(pattern=r"^/uploads/[0-9a-f]{32}\.(pdf|png|jpg|webp)$")]
-    color: Literal["bw", "color"]
-    paper_id: str
-    sides: Literal["single", "duplex"] = "single"
-    binding_id: str
-    copies: int = Field(ge=1, le=100)
-    urgent: bool = False
-    note: str = Field(default="", max_length=300)
-
-
 class OrderItemIn(Strict):
     product_id: str
     variant_id: str | None = None
