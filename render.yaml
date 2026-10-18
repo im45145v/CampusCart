@@ -49,6 +49,25 @@ services:
         sync: false
       - key: ADMIN_UPI_ID
         value: im45145v@oksbi
+  - type: web
+    name: campuscart-youpi
+    runtime: docker
+    dockerfilePath: youpi-render/Dockerfile
+    dockerContext: youpi-render
+    region: singapore
+    plan: free
+    healthCheckPath: /health
+    envVars:
+      - key: COIN_STORE_WEBHOOK_URL
+        value: https://campuscart-api-0f09.onrender.com/api/payments/youpi
+      - key: COIN_STORE_WEBHOOK_SECRET
+        sync: false
+      - key: ENCRYPTION_MASTER_KEY
+        sync: false
+      - key: YOUPI_UPI_ID
+        value: im45145v@oksbi
+      - key: YOUPI_UPI_NAME
+        value: UniCart
       - key: SEED_DEMO
         sync: false
   - type: web

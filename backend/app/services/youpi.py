@@ -92,7 +92,7 @@ def _api_root() -> str:
 async def create_payment(order_id: str, amount_minor: int, return_url: str) -> dict[str, str]:
     settings = get_settings()
     try:
-        async with httpx.AsyncClient(timeout=10) as client:
+        async with httpx.AsyncClient(timeout=60) as client:
             response = await client.post(
                 f"{_api_root()}/api/v1/payments",
                 headers={"X-Merchant-Id": settings.youpi_merchant_id},
@@ -125,7 +125,7 @@ async def create_payment(order_id: str, amount_minor: int, return_url: str) -> d
 async def fetch_payment(payment_id: str) -> dict[str, Any]:
     """Re-read a payment with the merchant key. The callback body is not this record."""
     try:
-        async with httpx.AsyncClient(timeout=10) as client:
+        async with httpx.AsyncClient(timeout=60) as client:
             response = await client.get(
                 f"{_api_root()}/api/v1/payments/{quote(payment_id, safe='')}",
                 headers={"X-Merchant-Key": get_settings().youpi_webhook_secret},

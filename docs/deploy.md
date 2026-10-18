@@ -27,7 +27,7 @@ This is the data layer behind the app. Atlas Vector Search is not wired up.
    - `PUBLIC_WEB_URL` — the static site origin, `https://…`, no trailing slash. Magic links in the email point here.
    - `YOUPI_API_URL` — YouPI payment API origin, no trailing slash, for example `https://pay.yourdomain.com` or the host serving port 6100.
    - `YOUPI_MERCHANT_ID` — the merchant id from the YouPI admin panel.
-   - `YOUPI_WEBHOOK_SECRET` — that merchant’s webhook secret. YouPI signs callbacks with it, and UniCart sends it back as `X-Merchant-Key` when re-reading a payment. In the YouPI merchant panel, set the webhook URL to `https://<api>/api/payments/youpi`.
+   - `YOUPI_WEBHOOK_SECRET` — the same value as `COIN_STORE_WEBHOOK_SECRET` on the `campuscart-youpi` service. YouPI signs callbacks with it, and UniCart sends it back as `X-Merchant-Key` when re-reading a payment. The YouPI service sends those callbacks to `https://<api>/api/payments/youpi`.
    - `ADMIN_UPI_ID` — unused for new top-ups. Left so an older environment still boots.
 3. On `campuscart-web`, set `VITE_API_URL` to the API origin, for example `https://campuscart-api.onrender.com`, with no trailing slash. Rebuild the static site after changing it. The browser derives the chat socket from that URL.
 4. Confirm `GET https://<api>/api/health` returns ok.
