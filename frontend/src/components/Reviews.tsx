@@ -107,7 +107,6 @@ export function ReviewForm({ orderId, onDone }: { orderId: string; onDone: (revi
   return (
     <Card className="space-y-4">
       <h2 className="font-bold">Review this order</h2>
-      <p className="text-sm text-taupe">One review per completed order. Say how the thing itself, the timing, and the price felt.</p>
       <div className="space-y-1"><p className="text-sm font-medium text-forest">Overall</p><Stars value={rating} onChange={setRating} /></div>
       <div className="grid gap-3 sm:grid-cols-3">
         <div className="space-y-1"><p className="text-sm font-medium text-forest">Quality</p><Stars value={aspects.quality} onChange={(n) => setAspect('quality', n)} /></div>

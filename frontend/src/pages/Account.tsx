@@ -57,14 +57,16 @@ export default function Account() {
     <div className="space-y-8">
       <div>
         <h1 className="text-2xl font-extrabold">Hi, {user?.name}</h1>
-        <p className="text-taupe">{user?.email} · roles: {user?.roles.join(', ')}</p>
+        <p className="text-taupe">{user?.email}</p>
         <div className="mt-3 flex gap-2"><Button asChild variant="secondary"><Link to="/inbox">Messages</Link></Button>{!user?.roles.includes('seller') && <Button asChild><Link to="/seller">Start selling</Link></Button>}</div>
       </div>
       <section aria-labelledby="wallet"><h2 id="wallet" className="mb-3 text-xl font-bold">Funds</h2><WalletPanel /></section>
-      <section aria-labelledby="plans">
-        <h2 id="plans" className="mb-3 text-xl font-bold">Your plans</h2>
-        <AccountPlans subs={subs.data ?? []} onChanged={() => void subs.reload()} />
-      </section>
+      {(subs.data?.length ?? 0) > 0 && (
+        <section aria-labelledby="plans">
+          <h2 id="plans" className="mb-3 text-xl font-bold">Your plans</h2>
+          <AccountPlans subs={subs.data ?? []} onChanged={() => void subs.reload()} />
+        </section>
+      )}
       <section aria-labelledby="oh"><h2 id="oh" className="mb-3 text-xl font-bold">Order history</h2><OrderList /></section>
       <section aria-labelledby="ss">
         <h2 id="ss" className="mb-3 text-xl font-bold">Saved stores</h2>

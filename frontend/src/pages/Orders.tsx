@@ -162,7 +162,7 @@ export function OrderDetail() {
         <ul className="divide-y divide-line">
           {data.items.map((l, i) => (
             <li key={i} className="py-2">
-              <div className="flex justify-between gap-3"><span>{l.quantity} × {l.title}{l.variant_name ? ` (${l.variant_name})` : ''}</span><span>{formatMoney(l.line_total_minor)}</span></div>
+              <div className="flex justify-between gap-3"><span>{l.quantity} × {l.title}{l.variant_name ? ` (${l.variant_name})` : ''}{l.rate_unit && l.billed_units ? ` · ${l.billed_units} ${l.rate_unit}${l.billed_units === 1 ? '' : 's'}` : ''}</span><span>{formatMoney(l.line_total_minor)}</span></div>
               {l.addons?.map((a) => <p key={a.id} className="text-sm text-taupe">{a.quantity} × {a.name} (+{formatMoney(a.price_minor)} each)</p>)}
               {l.print && (
                 <div className="mt-2 space-y-1 text-sm">

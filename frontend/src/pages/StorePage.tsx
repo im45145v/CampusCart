@@ -13,7 +13,7 @@ import { Card } from '@/components/ui/card'
 import { api } from '@/lib/api'
 import { useAuth } from '@/lib/auth'
 import { themeStyle } from '@/lib/theme'
-import { formatMoney } from '@/lib/utils'
+import { formatMoney, paysUpfront } from '@/lib/utils'
 import { useFetch } from '@/lib/useFetch'
 import type { OrderOptions, Plan, Product, Review, Store, Subscription, Voucher } from '@/lib/types'
 
@@ -66,6 +66,7 @@ export default function StorePage() {
             {o.min_order_minor > 0 && <li className="flex items-center gap-1 rounded-full bg-ivory px-3 py-1"><ShoppingBag className="h-3 w-3" aria-hidden /> Minimum order {formatMoney(o.min_order_minor)}</li>}
             {o.max_qty_per_item < 99 && <li className="rounded-full bg-ivory px-3 py-1">Up to {o.max_qty_per_item} of each item</li>}
             {o.fulfillment_options.length === 1 && <li className="rounded-full bg-ivory px-3 py-1">{o.fulfillment_options[0] === 'pickup' ? 'Pickup only' : 'Campus meetup only'}</li>}
+            {paysUpfront(o.payment_options) && <li className="rounded-full bg-ivory px-3 py-1">Pay upfront with campus credits. No cash at collection.</li>}
           </ul>
         )}
       </Card>
@@ -92,7 +93,7 @@ export default function StorePage() {
         <RatingBars hist={s.rating_hist} count={s.rating_count} />
         {reviews.data?.length ? (
           <ul className="space-y-3">{reviews.data.map((r) => <li key={r.id}><ReviewCard review={r} /></li>)}</ul>
-        ) : <p className="text-taupe">No reviews yet. Reviews come from completed orders.</p>}
+        ) : <p className="text-taupe">No reviews yet.</p>}
       </section>
     </div>
   )

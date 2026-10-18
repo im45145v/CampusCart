@@ -1,5 +1,6 @@
+import math
 from collections import OrderedDict
-from datetime import timedelta
+from datetime import datetime, time, timedelta
 from typing import Any
 
 from fastapi import HTTPException
@@ -158,6 +159,11 @@ def _check_answers(cfg: OrderSettings, answers: dict[str, str]) -> list[dict[str
             v = "yes" if v.lower() in ("yes", "true", "1") else ""
         elif f.type == "select" and v and v not in f.options:
             raise HTTPException(422, f"Invalid choice for {f.label}")
+        elif f.type == "date" and v:
+            try:
+                datetime.strptime(v, "%Y-%m-%d")
+            except ValueError:
+                raise HTTPException(422, f"{f.label} must be a date") from None
         if f.required and not v:
             raise HTTPException(422, f"{f.label} is required")
         if v:
@@ -197,8 +203,44 @@ def _order_files(extra: list[str], lines: list[dict[str, Any]]) -> list[str]:
     return urls[:5]
 
 
+def borrow_units(
+    product: dict[str, Any],
+    collect_on: Any,
+    return_on: Any,
+    slot_label: str | None,
+    return_time: str | None,
+) -> int:
+    """Days or hours between collect and return, capped by the listing."""
+    unit = product.get("rate_unit")
+    if unit not in ("day", "hour"):
+        return 1
+    title = str(product.get("title") or "This item")
+    if collect_on is None or return_on is None:
+        raise HTTPException(422, f"Choose the day you collect {title} and the day you bring it back")
+    cap = int(product["max_units"]) if product.get("max_units") else None
+    if unit == "day":
+        span = (return_on - collect_on).days
+        if span < 0:
+            raise HTTPException(422, f"Bring {title} back on or after the day you collect it")
+        units = max(1, span)
+        if cap and units > cap:
+            raise HTTPException(422, f"{title} can be borrowed for at most {cap} days")
+        return units
+    if not slot_label or not return_time:
+        raise HTTPException(422, f"Choose a handover time and the time you will bring {title} back")
+    start = datetime.combine(collect_on, time.fromisoformat(slot_label[:5]))
+    end = datetime.combine(return_on, time.fromisoformat(return_time))
+    if end <= start:
+        raise HTTPException(422, f"Bring {title} back after you collect it")
+    units = max(1, math.ceil((end - start).total_seconds() / 3600))
+    if cap and units > cap:
+        raise HTTPException(422, f"{title} can be borrowed for at most {cap} hours")
+    return units
+
+
 async def build_order_lines(
-    db: Database, store: dict[str, Any], items: list[Any]
+    db: Database, store: dict[str, Any], items: list[Any],
+    *, collect_on: Any = None, return_on: Any = None, return_time: str | None = None, slot_label: str | None = None,
 ) -> tuple[list[dict[str, Any]], bool, int]:
     cfg = store_settings(store)
     merged: OrderedDict[tuple[Any, ...], int] = OrderedDict()
@@ -248,11 +290,13 @@ async def build_order_lines(
         if p["kind"] == "printing":
             needs_quote = True
         price, name, stock = base_price(p, vid)
+        units = borrow_units(p, collect_on, return_on, slot_label, return_time)
         chosen, addons_minor = _priced_addons(p, [AddonPick(id=i, quantity=q) for i, q in signature])
         lines.append({
             "product_id": pid, "variant_id": vid, "title": p["title"], "variant_name": name,
             "unit_price_minor": price, "quantity": qty, "addons": chosen, "addons_minor": addons_minor,
-            "line_total_minor": (price + addons_minor) * qty, "tracked": stock is not None, "print": None,
+            "billed_units": units, "rate_unit": p.get("rate_unit"),
+            "line_total_minor": (price * units + addons_minor) * qty, "tracked": stock is not None, "print": None,
             "listing_type": p.get("listing_type") or "new",
             "category": p.get("category") or "", "kind": p.get("kind") or "product",
         })
@@ -339,7 +383,17 @@ async def create_order(db: Database, buyer: dict[str, Any], body: OrderIn) -> di
         raise HTTPException(422, "This store does not accept that payment option")
     slot = _check_slot(cfg, body)
     answers = _check_answers(cfg, body.answers)
-    lines, needs_quote, prep_min = await build_order_lines(db, store, body.items)
+    collect_on = body.pickup_slot.date if body.pickup_slot else body.collect_on
+    if body.return_on and not any(a["id"] == "return_by" for a in answers):
+        due = body.return_on.isoformat()
+        if body.return_time:
+            due = f"{due} {body.return_time}"
+        answers.append({"id": "return_by", "label": "Bring it back on", "value": due})
+    lines, needs_quote, prep_min = await build_order_lines(
+        db, store, body.items,
+        collect_on=collect_on, return_on=body.return_on, return_time=body.return_time,
+        slot_label=body.pickup_slot.label if body.pickup_slot else None,
+    )
 
     catalogue = sum(x["line_total_minor"] for x in lines if not x.get("print"))
     printed = sum(x["line_total_minor"] for x in lines if x.get("print"))
@@ -367,7 +421,7 @@ async def create_order(db: Database, buyer: dict[str, Any], body: OrderIn) -> di
         else:
             for r in reserved:
                 await _restore(db, r)
-            raise HTTPException(409, f"Not enough stock for {line['title']}")
+            raise HTTPException(409, f"Not enough left of {line['title']}. Someone else took the last ones.")
 
     status = "quote_requested" if needs_quote else "placed"
     order = {

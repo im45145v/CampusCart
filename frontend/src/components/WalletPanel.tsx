@@ -77,7 +77,7 @@ export function WalletPanel() {
       <Card className="bg-forest text-white">
         <p className="text-sm text-white/80">Campus wallet</p>
         <p className="font-heading text-3xl font-extrabold text-white">{formatMoney(wallet.data.balance_minor)}</p>
-        <p className="mt-2 max-w-xl text-sm text-white/80">Spendable campus credits for orders and seller plans. Buyer top-ups and seller earnings share this balance. Karma stays separate, and nothing here is a bank payment.</p>
+        <p className="mt-2 max-w-xl text-sm text-white/80">Campus credits for orders and stall plans. This balance is not a bank account.</p>
       </Card>
       <div className="grid gap-4 lg:grid-cols-2">
         <Card><MoneyForm kind="add" onDone={reload} /></Card>

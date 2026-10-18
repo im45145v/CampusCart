@@ -42,7 +42,7 @@ class StoreTheme(Strict):
 class CustomField(Strict):
     id: Annotated[str, StringConstraints(pattern=r"^[a-z0-9_]{1,30}$")]
     label: Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=80)]
-    type: Literal["text", "select", "checkbox"] = "text"
+    type: Literal["text", "select", "checkbox", "date"] = "text"
     required: bool = False
     options: list[Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=60)]] = Field(
         default_factory=list, max_length=12
@@ -194,6 +194,9 @@ class ProductIn(Strict):
     prep_time_min: int = Field(default=0, ge=0, le=60 * 24 * 14)
     condition: str | None = Field(default=None, max_length=60)
     karma_value: int | None = Field(default=None, ge=0, le=100_000)  # never money
+    rate_unit: Literal["day", "hour"] | None = None  # borrow rate; absent means one flat price
+    max_units: int | None = Field(default=None, ge=1, le=336)  # seller cap, in days or hours
+    featured: bool = False  # seller choice for the home page; not a paid placement
 
 
 class ProductPatch(Strict):
@@ -212,6 +215,9 @@ class ProductPatch(Strict):
     prep_time_min: int | None = Field(default=None, ge=0, le=60 * 24 * 14)
     condition: str | None = Field(default=None, max_length=60)
     karma_value: int | None = Field(default=None, ge=0, le=100_000)
+    rate_unit: Literal["day", "hour"] | None = None
+    max_units: int | None = Field(default=None, ge=1, le=336)
+    featured: bool | None = None
 
 
 class AddonPick(Strict):
@@ -249,6 +255,9 @@ class OrderIn(Strict):
     fulfillment: Fulfillment = "pickup"
     payment_method: PaymentMethod = "pay_on_pickup"
     pickup_slot: PickupSlotIn | None = None
+    collect_on: dt.date | None = None
+    return_on: dt.date | None = None
+    return_time: Annotated[str, StringConstraints(pattern=r"^([01]\d|2[0-3]):[0-5]\d$")] | None = None
     answers: dict[
         Annotated[str, StringConstraints(max_length=30)], Annotated[str, StringConstraints(max_length=300)]
     ] = Field(default_factory=dict, max_length=8)
@@ -301,6 +310,10 @@ class VoucherPreviewIn(Strict):
     code: Annotated[str, StringConstraints(strip_whitespace=True, min_length=4, max_length=16)]
     items: list[OrderItemIn] = Field(min_length=1, max_length=50)
     payment_method: PaymentMethod = "pay_on_pickup"
+    pickup_slot: PickupSlotIn | None = None
+    collect_on: dt.date | None = None
+    return_on: dt.date | None = None
+    return_time: Annotated[str, StringConstraints(pattern=r"^([01]\d|2[0-3]):[0-5]\d$")] | None = None
 
 
 class NotificationReadIn(Strict):

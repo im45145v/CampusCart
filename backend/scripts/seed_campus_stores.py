@@ -27,7 +27,7 @@ def photo(photo_id: str, width: int, height: int) -> str:
 
 LEND_SETTINGS: dict[str, Any] = {
     "fulfillment_options": ["pickup", "campus_meetup"],
-    "payment_options": ["pay_on_pickup", "campus_wallet"],
+    "payment_options": ["campus_wallet"],
     "slots_enabled": True,
     "slots": ["12:00-14:00", "16:00-18:00", "18:00-20:00"],
     "slot_required": True,
@@ -37,11 +37,11 @@ LEND_SETTINGS: dict[str, Any] = {
     "queue_min_per_order": 0,
     "max_qty_per_item": 1,
     "order_instructions": (
-        "This is a borrow. The price is the fee for the dates you write, not a deposit. "
-        "Bring the item back in the same condition. Any cash deposit stays between you and the owner."
+        "Pay upfront with campus credits. This stall does not take cash when you collect. "
+        "The price is the rate on the listing, per day or per hour, up to the longest borrow that listing allows. "
+        "It is not a deposit. A cancel or rejection returns the credits."
     ),
     "custom_fields": questions(
-        ("return_by", "Bring it back on", "text", True, []),
         ("use_where", "Where you will use it", "text", True, []),
         ("condition_ok", "I will return it in the same condition", "checkbox", True, []),
     ),
@@ -79,7 +79,7 @@ STORES: list[dict[str, Any]] = [
             ),
         },
         "products": [
-            {"title": "Veg fried rice", "description": "Rice, mixed vegetables, soy, and spring onion.", "price_minor": 9000, "stock": 40, "prep_time_min": 12, "category": "rice", "addons": "rice", "image": "1603133872878-684f208fb84b"},
+            {"title": "Veg fried rice", "description": "Rice, mixed vegetables, soy, and spring onion.", "price_minor": 9000, "stock": 40, "prep_time_min": 12, "category": "rice", "addons": "rice", "image": "1603133872878-684f208fb84b", "featured": True},
             {"title": "Egg fried rice", "description": "The veg wok with two eggs scrambled through the rice.", "price_minor": 11000, "stock": 30, "prep_time_min": 12, "category": "rice", "addons": "rice", "image": "1525351484163-7529414344d8"},
             {"title": "Chicken fried rice", "description": "Small-cut chicken, rice, and the house soy sauce.", "price_minor": 14000, "stock": 24, "prep_time_min": 15, "category": "rice", "addons": "chicken", "image": "1604908176997-125f25cc6f3d"},
             {"title": "Paneer fried rice", "description": "Paneer cubes, pepper, and fried rice.", "price_minor": 13000, "stock": 20, "prep_time_min": 14, "category": "rice", "addons": "rice", "image": "1546069901-ba9599a7e63c"},
@@ -122,7 +122,7 @@ STORES: list[dict[str, Any]] = [
             {"title": "Americano", "description": "Espresso lengthened with hot water.", "category": "coffee", "prep_time_min": 4, "variants": [("Small", 5000, 40), ("Regular", 7000, 40), ("Large", 9000, 30)], "image": "1497935586351-b67a49e012bf"},
             {"title": "Cappuccino", "description": "Espresso, steamed milk, and foam.", "category": "coffee", "prep_time_min": 6, "variants": [("Small", 7000, 30), ("Regular", 9000, 30), ("Large", 11000, 20)], "image": "1509042239860-f550ce710b93"},
             {"title": "Latte", "description": "More milk, less foam.", "category": "coffee", "prep_time_min": 6, "variants": [("Small", 8000, 30), ("Regular", 10000, 30), ("Large", 12000, 20)], "image": "1572442388796-11668a67e53d"},
-            {"title": "Filter coffee", "description": "Decoction and milk, served in a glass.", "category": "coffee", "prep_time_min": 5, "variants": [("Regular", 4000, 50), ("Strong", 5000, 40)], "image": "1442512595331-e89e73853f31"},
+            {"title": "Filter coffee", "description": "Decoction and milk, served in a glass.", "category": "coffee", "prep_time_min": 5, "variants": [("Regular", 4000, 50), ("Strong", 5000, 40)], "image": "1442512595331-e89e73853f31", "featured": True},
             {"title": "Cold coffee", "description": "Blended with milk and a little sugar unless you say otherwise.", "category": "coffee", "prep_time_min": 8, "variants": [("Regular", 9000, 25), ("Large", 12000, 20)], "image": "1461023058943-07fcbe16d735"},
             {"title": "Mocha", "description": "Espresso, cocoa, and milk.", "category": "coffee", "prep_time_min": 6, "variants": [("Regular", 11000, 20), ("Large", 13000, 16)], "image": "1495474472287-4d71bcdd2085"},
         ],
@@ -141,7 +141,7 @@ STORES: list[dict[str, Any]] = [
         "theme": {"primary": "#2F5BEA", "accent": "#16213E", "background": "#F3F5FA", "font": "modern", "radius": "sharp"},
         "order_settings": {
             "fulfillment_options": ["pickup", "campus_meetup"],
-            "payment_options": ["pay_on_pickup", "manual_confirmation", "campus_wallet"],
+            "payment_options": ["campus_wallet"],
             "slots_enabled": True,
             "slots": ["12:00-14:00", "14:00-16:00", "16:00-18:00"],
             "slot_required": True,
@@ -149,13 +149,13 @@ STORES: list[dict[str, Any]] = [
             "slot_capacity": 8,
             "lead_time_min": 30,
             "min_order_minor": 0,
-            "order_instructions": "Upload the file on the print listing. Page count, paper, sides, binding, and copies are priced before you place the order.",
+            "order_instructions": "Pay upfront with campus credits. This desk does not take cash when you collect. The file is priced before you place the order.",
             "custom_fields": questions(
                 ("packet", "Name on the packet", "text", True, []),
             ),
         },
         "products": [
-            {"title": "Document printing", "description": "Notes and assignments. Upload a PDF or a photo. Black and white is ₹1 a page, colour is ₹5, then paper and binding.", "kind": "printing", "price_minor": 100, "prep_time_min": 30, "category": "print", "print_spec": True, "image": "1434030216411-0b793f4b4173"},
+            {"title": "Document printing", "description": "Notes and assignments. Upload a PDF or a photo. Black and white is ₹1 a page, colour is ₹5, then paper and binding.", "kind": "printing", "price_minor": 100, "prep_time_min": 30, "category": "print", "print_spec": True, "image": "1434030216411-0b793f4b4173", "featured": True},
             {"title": "Colour printing", "description": "Slides, diagrams, and photos. Same rate card: the file's page count sets the price.", "kind": "printing", "price_minor": 500, "prep_time_min": 40, "category": "print", "print_spec": True, "image": "1612815154858-60aa4c59eaa6"},
             {"title": "Poster print", "description": "One poster. Pick the sheet size. This is a fixed price, not a quote.", "kind": "product", "price_minor": 4000, "prep_time_min": 45, "category": "poster", "variants": [("A3", 4000, 20), ("A2", 8000, 12), ("A1", 15000, 6)], "image": "1454165804606-c3d57bc86b40"},
             {"title": "Spiral binding", "description": "Plastic coil. Pick how thick the document is.", "kind": "product", "price_minor": 3000, "prep_time_min": 15, "category": "binding", "variants": [("Up to 50 pages", 3000, 40), ("Up to 150 pages", 5000, 30), ("Up to 300 pages", 8000, 15)], "image": "1517842645767-c639042777db"},
@@ -164,60 +164,35 @@ STORES: list[dict[str, Any]] = [
         ],
     },
     {
-        "owner": ("Meera", "meera.lend@campus.test", "MeeraLend1"),
-        "name": "Meera's Projector",
-        "category": "lending",
-        "logo": "1478720568477-152d9b164e26",
-        "banner": "1478720568477-152d9b164e26",
-        "tagline": "One projector, from my room, for society screenings",
-        "description": "I lend my own projector. The price is the borrow fee for the dates you write, not a purchase and not a deposit.",
-        "announcement": "Book a handover slot. Tell me the day you will bring it back.",
-        "operating_hours": "Mon–Sat 16:00–21:00",
-        "pickup_details": "Meera, hostel C common room. I hand it over and I take it back there.",
-        "theme": {"primary": "#1B3A4B", "accent": "#C65D3A", "background": "#F4F1EA", "font": "modern", "radius": "soft"},
-        "order_settings": LEND_SETTINGS,
-        "products": [
-            {"title": "Portable projector", "description": "Borrow fee covers up to two days. HDMI lead comes with it. One piece, so the next person waits until you bring it back.", "price_minor": 12000, "stock": 1, "prep_time_min": 0, "category": "gear", "listing_type": "lend", "image": "1478720568477-152d9b164e26"},
-        ],
-    },
-    {
-        "owner": ("Arjun", "arjun.lend@campus.test", "ArjunLend1"),
-        "name": "Arjun Audio",
-        "category": "lending",
-        "logo": "1608043152269-423dbba4e7e1",
-        "banner": "1545454675-3531b543be5d",
-        "tagline": "A speaker and a mic from my cupboard, not a shop",
-        "description": "I lend sound gear I own. Fee for the dates you name. Bring it back charged, or with the same batteries.",
-        "announcement": "The bluetooth speaker is usually free on weekday evenings.",
-        "operating_hours": "Mon–Sun 12:00–20:00",
-        "pickup_details": "Arjun, library steps. Message me if you are more than ten minutes late.",
-        "theme": {"primary": "#6B3A2A", "accent": "#2C1810", "background": "#F6F1EA", "font": "rounded", "radius": "soft"},
-        "order_settings": LEND_SETTINGS,
-        "products": [
-            {"title": "Bluetooth speaker", "description": "Borrow fee for up to a day. Two of these, so a second person can still take one.", "price_minor": 4000, "stock": 2, "prep_time_min": 0, "category": "gear", "listing_type": "lend", "image": "1608043152269-423dbba4e7e1"},
-            {"title": "Bookshelf speaker", "description": "Needs a socket. Borrow fee for an evening.", "price_minor": 6000, "stock": 1, "prep_time_min": 0, "category": "gear", "listing_type": "lend", "image": "1545454675-3531b543be5d"},
-            {"title": "Small mic", "description": "Clip mic for a talk. Borrow fee for one event.", "price_minor": 3000, "stock": 1, "prep_time_min": 0, "category": "gear", "listing_type": "lend", "image": "1590602847861-f357a9332bbc"},
-        ],
-    },
-    {
-        "owner": ("Rhea", "rhea.lend@campus.test", "RheaLend1"),
-        "name": "Rhea's Kit",
+        "owner": ("Potato", "potato.lend@campus.test", "PotatoLend1"),
+        "name": "Potato's Makerspace",
         "category": "lending",
         "logo": "1581244277943-fe4a9c777189",
         "banner": "1530124566582-a618bc2615dc",
-        "tagline": "Screwdrivers and a drill, from my toolbox",
-        "description": "I lend tools I use for hostel repairs. The fee is for the borrow. Count the bits when you take the kit and when you bring it back.",
-        "announcement": "Drill batteries come full. Bring the drill back before the battery is flat if you can.",
-        "operating_hours": "Mon–Fri 17:00–20:00, Sat 11:00–16:00",
-        "pickup_details": "Rhea, workshop shed behind hostel B.",
+        "tagline": "Projector, speakers, and tools from one campus bench",
+        "description": "One makerspace desk. Borrow a projector, a speaker, a mic, or a tool. The price is the fee for the dates you write, not a purchase and not a deposit.",
+        "announcement": "Book a handover slot and say the day you will bring it back.",
+        "operating_hours": "Mon–Sat 12:00–20:00",
+        "pickup_details": "Potato's Makerspace, workshop shed behind hostel B.",
         "theme": {"primary": "#3D4F3A", "accent": "#1E2A1C", "background": "#F3F4EF", "font": "modern", "radius": "sharp"},
         "order_settings": LEND_SETTINGS,
         "products": [
-            {"title": "Screwdriver kit", "description": "Bits in a roll. Borrow fee for a day. Two kits.", "price_minor": 2000, "stock": 2, "prep_time_min": 0, "category": "gear", "listing_type": "lend", "image": "1581244277943-fe4a9c777189"},
-            {"title": "Cordless drill", "description": "One drill, with a battery. Borrow fee for a day.", "price_minor": 5000, "stock": 1, "prep_time_min": 0, "category": "gear", "listing_type": "lend", "image": "1572981779307-38b8cabb2407"},
+            {"title": "Portable projector", "description": "₹120 a day, up to 2 days. HDMI lead comes with it. One piece, so the next person waits until you bring it back.", "price_minor": 12000, "stock": 1, "prep_time_min": 0, "category": "gear", "listing_type": "lend", "rate_unit": "day", "max_units": 2, "image": "1478720568477-152d9b164e26", "featured": True},
+            {"title": "Bluetooth speaker", "description": "₹40 a day, up to 1 day. Two of these, so a second person can still take one.", "price_minor": 4000, "stock": 2, "prep_time_min": 0, "category": "gear", "listing_type": "lend", "rate_unit": "day", "max_units": 1, "image": "1608043152269-423dbba4e7e1"},
+            {"title": "Bookshelf speaker", "description": "Needs a socket. ₹60 an hour, up to 6 hours.", "price_minor": 6000, "stock": 1, "prep_time_min": 0, "category": "gear", "listing_type": "lend", "rate_unit": "hour", "max_units": 6, "image": "1545454675-3531b543be5d"},
+            {"title": "Small mic", "description": "Clip mic for a talk. ₹30 an hour, up to 4 hours.", "price_minor": 3000, "stock": 1, "prep_time_min": 0, "category": "gear", "listing_type": "lend", "rate_unit": "hour", "max_units": 4, "image": "1590602847861-f357a9332bbc"},
+            {"title": "Screwdriver kit", "description": "Bits in a roll. ₹20 a day, up to 2 days. Two kits.", "price_minor": 2000, "stock": 2, "prep_time_min": 0, "category": "gear", "listing_type": "lend", "rate_unit": "day", "max_units": 2, "image": "1581244277943-fe4a9c777189"},
+            {"title": "Cordless drill", "description": "One drill, with a battery. ₹50 a day, up to 1 day.", "price_minor": 5000, "stock": 1, "prep_time_min": 0, "category": "gear", "listing_type": "lend", "rate_unit": "day", "max_units": 1, "image": "1572981779307-38b8cabb2407"},
         ],
     },
 ]
+
+# Earlier demo lending accounts. Hidden so the catalogue stays one makerspace until real students open their own.
+RETIRED_LENDERS = (
+    "meera.lend@campus.test",
+    "arjun.lend@campus.test",
+    "rhea.lend@campus.test",
+)
 
 
 async def account(client: httpx.AsyncClient, name: str, email: str, password: str) -> dict[str, str]:
@@ -272,6 +247,7 @@ def product_body(raw: dict[str, Any]) -> dict[str, Any]:
         "price_minor": raw.get("price_minor", variants[0]["price_minor"] if variants else 0),
         "prep_time_min": raw.get("prep_time_min", 0),
         "available": True,
+        "featured": bool(raw.get("featured")),
         "variants": variants,
     }
     if "stock" in raw and not variants:
@@ -283,6 +259,9 @@ def product_body(raw: dict[str, Any]) -> dict[str, Any]:
         body["print_spec"] = PRINT_SPEC
     if raw.get("image"):
         body["image_urls"] = [photo(raw["image"], 800, 600)]
+    if raw.get("rate_unit"):
+        body["rate_unit"] = raw["rate_unit"]
+        body["max_units"] = raw["max_units"]
     return body
 
 
@@ -362,7 +341,7 @@ async def seed() -> None:
             for raw in spec["products"]:
                 body = product_body(raw)
                 if raw["title"] in have:
-                    patch = {k: body[k] for k in ("addons", "print_spec", "description", "image_urls", "listing_type") if k in body}
+                    patch = {k: body[k] for k in ("addons", "print_spec", "description", "image_urls", "listing_type", "price_minor", "rate_unit", "max_units", "featured") if k in body and body[k] is not None}
                     if patch:
                         updated = await client.patch(f"/api/products/{have[raw['title']]['id']}", headers=headers, json=patch)
                         updated.raise_for_status()
@@ -390,11 +369,26 @@ async def seed() -> None:
     await database.users.update_one({"_id": user["_id"]}, {"$addToSet": {"roles": "admin"}})
     await record(database, "cli", "user.promote_admin", "user", user["_id"])
     print("admin role granted")
+    await retire_extra_lenders(database)
     await ensure_demo_vouchers(
         database, store_ids,
         {spec["name"]: owners[spec["owner"][1]]["id"] for spec in STORES},
         user["_id"],
     )
+
+
+async def retire_extra_lenders(database: Any) -> None:
+    """Hide the first three lending stalls. Their gear now lives in Potato's Makerspace."""
+    for email in RETIRED_LENDERS:
+        user = await database.users.find_one({"email": email})
+        if user is None:
+            continue
+        res = await database.stores.update_many(
+            {"owner_id": user["_id"], "category": "lending", "status": "active"},
+            {"$set": {"status": "suspended", "is_open": False}},
+        )
+        if res.modified_count:
+            print(f"hid lending stall for {email}")
 
 
 def _voucher(**fields: Any) -> dict[str, Any]:

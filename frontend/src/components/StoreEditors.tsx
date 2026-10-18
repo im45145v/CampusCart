@@ -155,7 +155,7 @@ const QUESTION_PACKS: { name: string; blurb: string; fields: CustomField[] }[] =
   {
     name: 'Lending desk', blurb: 'Return date and campus ID',
     fields: [
-      { id: 'return_by', label: 'Return by (date)', type: 'text', required: true, options: [] },
+      { id: 'return_by', label: 'Return by', type: 'date', required: true, options: [] },
       { id: 'student_id', label: 'Last 4 of campus ID', type: 'text', required: true, options: [] },
       { id: 'condition_ok', label: 'I will return it in the same condition', type: 'checkbox', required: true, options: [] },
     ],
@@ -175,7 +175,7 @@ function QuestionEditor({ fields, onChange }: { fields: CustomField[]; onChange:
         <div key={f.id} className="space-y-2 rounded-xl border border-line bg-white p-3">
           <div className="grid gap-2 sm:grid-cols-[1fr_10rem]">
             <Field label="Question buyers see"><Input value={f.label} maxLength={80} placeholder="e.g. Spice level" onChange={(e) => patch(i, { label: e.target.value, id: f.label ? f.id : slug(e.target.value) + '_' + (i + 1) })} /></Field>
-            <Field label="Answer type"><Select value={f.type} onChange={(e) => patch(i, { type: e.target.value as CustomField['type'] })}><option value="text">Short text</option><option value="select">Choose one</option><option value="checkbox">Yes / no</option></Select></Field>
+            <Field label="Answer type"><Select value={f.type} onChange={(e) => patch(i, { type: e.target.value as CustomField['type'] })}><option value="text">Short text</option><option value="date">Date</option><option value="select">Choose one</option><option value="checkbox">Yes / no</option></Select></Field>
           </div>
           {f.type === 'select' && <Field label="Choices (comma separated, at least two)"><Input value={f.options.join(', ')} onChange={(e) => patch(i, { options: e.target.value.split(',').map((o) => o.trim()).filter(Boolean) })} placeholder="mild, medium, hot" /></Field>}
           <div className="flex items-center justify-between">
@@ -197,7 +197,6 @@ function QuestionEditor({ fields, onChange }: { fields: CustomField[]; onChange:
           }}>{pack.name}</Button>
         ))}
       </div>
-      <p className="text-xs text-taupe">Keep up to eight questions. Packs drop in the usual food, print, and lending questions; you can still edit each one.</p>
     </div>
   )
 }
@@ -215,9 +214,9 @@ export function OrderSettingsEditor({ value, onChange }: { value: OrderSettings;
         <legend className="font-semibold text-forest">How buyers receive orders</legend>
         <Toggle label="Pickup at the store" checked={value.fulfillment_options.includes('pickup')} onChange={(v) => set('fulfillment_options', pick(value.fulfillment_options, 'pickup', v))} />
         <Toggle label="Campus meetup" checked={value.fulfillment_options.includes('campus_meetup')} onChange={(v) => set('fulfillment_options', pick(value.fulfillment_options, 'campus_meetup', v))} />
-        <Toggle label="Pay on pickup" checked={value.payment_options.includes('pay_on_pickup')} onChange={(v) => set('payment_options', pick(value.payment_options, 'pay_on_pickup', v))} />
-        <Toggle label="Pay seller directly (you confirm receipt)" hint="CampusCart never processes or verifies payments." checked={value.payment_options.includes('manual_confirmation')} onChange={(v) => set('payment_options', pick(value.payment_options, 'manual_confirmation', v))} />
-        <Toggle label="Campus wallet" hint="Debits the buyer's campus credits when the price is known. Quotes are charged only after the buyer approves. Cancelled orders are credited back. This is not a bank payment." checked={value.payment_options.includes('campus_wallet')} onChange={(v) => set('payment_options', pick(value.payment_options, 'campus_wallet', v))} />
+        <Toggle label="Pay on pickup" hint="Cash when they collect. Turn this off if you will not start until campus credits are taken." checked={value.payment_options.includes('pay_on_pickup')} onChange={(v) => set('payment_options', pick(value.payment_options, 'pay_on_pickup', v))} />
+        <Toggle label="Pay seller directly (you confirm receipt)" hint="You mark that you received it. CampusCart does not check a bank or UPI." checked={value.payment_options.includes('manual_confirmation')} onChange={(v) => set('payment_options', pick(value.payment_options, 'manual_confirmation', v))} />
+        <Toggle label="Campus wallet" hint="Campus credits, taken when the price is known. If this is the only method, the stall is listed as pay upfront. A cancel or rejection returns the credits. This is not a bank payment." checked={value.payment_options.includes('campus_wallet')} onChange={(v) => set('payment_options', pick(value.payment_options, 'campus_wallet', v))} />
       </fieldset>
 
       <fieldset className="space-y-3">
@@ -254,7 +253,6 @@ export function OrderSettingsEditor({ value, onChange }: { value: OrderSettings;
 
       <fieldset className="space-y-3">
         <legend className="font-semibold text-forest">Checkout questions</legend>
-        <p className="text-sm text-taupe">Ask several things while someone orders: hostel, spice, paper size, when a borrowed item comes back.</p>
         <QuestionEditor fields={value.custom_fields} onChange={(f) => set('custom_fields', f)} />
         <Field label="Message shown at checkout (optional)"><Textarea maxLength={300} className="min-h-16" value={value.order_instructions} onChange={(e) => set('order_instructions', e.target.value)} placeholder="e.g. Bring your ID card when you collect." /></Field>
       </fieldset>

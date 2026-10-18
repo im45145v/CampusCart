@@ -1,6 +1,6 @@
 import { Star } from 'lucide-react'
 import { Link } from 'react-router-dom'
-import { formatMoney } from '@/lib/utils'
+import { formatMoney, paysUpfront } from '@/lib/utils'
 import { DEFAULT_THEME } from '@/lib/theme'
 import type { Product, Store } from '@/lib/types'
 import { Badge } from './ui/badge'
@@ -23,6 +23,7 @@ export function StoreCard({ store }: { store: Store }) {
           <div className="mt-2 flex items-center gap-2 text-xs">
             <Badge tone={store.is_open ? 'ok' : 'neutral'}>{store.is_open ? 'Open' : 'Closed'}</Badge>
             <Badge>{store.category}</Badge>
+            {paysUpfront(store.order_settings?.payment_options) && <Badge tone="warn">Pay upfront</Badge>}
             {store.rating_count > 0 && (
               <span className="flex items-center gap-1 text-taupe"><Star className="h-3 w-3 fill-current" aria-hidden /> {store.rating_avg.toFixed(1)} ({store.rating_count})</span>
             )}
@@ -43,9 +44,10 @@ export function ProductCard({ product }: { product: Product }) {
         <h3 className="font-bold">{product.title}</h3>
         <p className="text-terracotta font-semibold">
           {(product.variants.length > 0 || product.print_spec) && 'from '}{formatMoney(product.price_from_minor)}
-          {product.print_spec ? ' / page' : product.kind === 'printing' ? ' (quote)' : product.listing_type === 'lend' ? ' borrow fee' : ''}
+          {product.print_spec ? ' / page' : product.kind === 'printing' ? ' (quote)' : product.rate_unit ? ` / ${product.rate_unit}` : product.listing_type === 'lend' ? ' borrow fee' : ''}
         </p>
         <div className="mt-1 flex gap-2">
+          {product.featured && <Badge tone="warn">Featured</Badge>}
           {product.in_stock ? <Badge tone="ok">Available</Badge> : <Badge tone="bad">Unavailable</Badge>}
           {product.listing_type !== 'new' && <Badge>{product.listing_type}</Badge>}
         </div>

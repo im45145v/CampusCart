@@ -82,8 +82,8 @@ export function VoucherDesk({
         <h3 className="text-lg font-bold">{campus ? 'Campus code' : 'Store code'}</h3>
         <p className="text-sm text-taupe">
           {campus
-            ? 'A campus code works at every open store. The store receives what the student pays. CampusCart does not reimburse the discount.'
-            : 'Students pay less, and you receive that amount. CampusCart does not add the difference back. A paused code stops new orders; cancelling an order frees the use.'}
+            ? 'Works at every open stall. You receive what the student pays.'
+            : 'You receive what the student pays. Pause a code to stop new uses.'}
         </p>
         <form onSubmit={save} className="grid gap-3 sm:grid-cols-2">
           <Field label="Code"><Input required minLength={4} maxLength={16} value={f.code} onChange={(e) => setF({ ...f, code: e.target.value.toUpperCase() })} placeholder="FIRSTBITE" /></Field>

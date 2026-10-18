@@ -1,4 +1,4 @@
-import { MessageSquare, ShoppingBag, Store as StoreIcon, UserRound } from 'lucide-react'
+import { MessageSquare, ShoppingBag, UserRound } from 'lucide-react'
 import { Notifications } from './Notifications'
 import { Link, NavLink, Outlet, Navigate, useLocation } from 'react-router-dom'
 import { useAuth } from '@/lib/auth'
@@ -46,9 +46,16 @@ export function Layout() {
       <main className="mx-auto w-full max-w-6xl flex-1 px-4 py-6">
         <Outlet />
       </main>
-      <footer className="border-t border-line py-6 text-center text-sm text-taupe">
-        <StoreIcon className="mr-1 inline h-4 w-4" aria-hidden />
-        CampusCart: campus store and lending desk. Wallet credits are an on-campus ledger. Pay on pickup is confirmed by the seller.
+      <footer className="border-t border-line">
+        <div className="mx-auto flex max-w-6xl flex-col gap-3 px-4 py-6 text-sm text-taupe sm:flex-row sm:items-center sm:justify-between">
+          <p>CampusCart. Student stalls, print jobs, and gear you can borrow.</p>
+          <nav aria-label="Footer" className="flex flex-wrap gap-x-4 gap-y-1">
+            <Link className="underline" to="/help">Help</Link>
+            <Link className="underline" to="/payments">Payments</Link>
+            <Link className="underline" to="/terms">Terms</Link>
+            <Link className="underline" to="/privacy">Privacy</Link>
+          </nav>
+        </div>
       </footer>
     </div>
   )

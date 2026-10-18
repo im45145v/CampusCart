@@ -12,7 +12,7 @@ UNO Q service (edge/uno_q) --read-only API token--> /api/edge/*
   be granted with `python -m scripts.create_admin <email>` (run from `backend/`). Permissions are enforced in
   `app/deps.py` and in each router (ownership checks).
 - **Money** is stored as integer minor units (`*_minor`). Totals are always computed by the server from stored prices.
-- **Catalogue:** one `products` shape serves food, printing, handmade, goods, services, and lending. A listing type field covers
+- **Catalogue:** one `products` shape serves food, printing, handmade, goods, services, and lending. A seller may mark up to three listings `featured`; the home page shows those, plus just-listed and category rows for food, printing, and lending. Featuring is free and does not expire. A listing type field covers
   new, second-hand, rent, lend and exchange. A lending store is one student lending their own things. A karma value is a separate integer and never mixes with money
   (a karma ledger and exchange flow are not implemented yet).
 - **Orders** (`app/services/orders.py`): statuses `placed, quote_requested, quoted, accepted, preparing, ready,
@@ -20,11 +20,12 @@ UNO Q service (edge/uno_q) --read-only API token--> /api/edge/*
   atomic update (`stock >= qty`) so concurrent orders cannot oversell; it is restored exactly once on cancel/reject.
   A `lend` line is restored again when the owner marks the order completed, so the piece can be borrowed by the next student. A sale stays sold.
   Printing orders start as `quote_requested`; the seller sends a manual quote and the buyer approves it.
-  Payment is pay-on-pickup, paid directly to the seller (seller confirms), or campus-wallet credits.
+  Payment is whatever that stall enabled: pay on pickup, paid directly to the seller (seller confirms), or campus-wallet credits.
+  A stall whose only method is campus wallet is pay upfront. The debit runs when the catalogue total is known, or when the buyer accepts a quote.
   Campus wallet is an on-campus ledger in `wallet_ledger`: the student records a top-up, staff can reverse it,
   and payouts are requests the desk marks paid. No UPI or bank payment is verified. Wallet charges are atomic
   (`balance >= amount`). Catalogue orders from an active store plan are discounted on the server; quote orders are not.
-  Completing a wallet-paid order credits the seller the charged amount (no platform fee). Cancel or reject refunds it once.
+  Completing a wallet-paid order credits the seller the charged amount (no platform fee). Cancel or reject refunds it once, including a cancel after the seller has accepted.
 - **Plans:** sellers publish up to six memberships (`plans`). Subscribing or renewing debits the campus wallet.
   There is no card charge and no silent auto-renew. One active subscription per buyer per store.
 - **Vouchers:** store codes and campus-wide codes live in `vouchers`. Checkout computes the discount in minor units

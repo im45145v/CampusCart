@@ -21,6 +21,7 @@ def product_view(p: dict[str, Any]) -> dict[str, Any]:
         d["price_from_minor"] = min(v["price_minor"] for v in variants)
     else:
         d["price_from_minor"] = d["price_minor"]
+    d["featured"] = bool(d.get("featured"))
     d["addons"] = d.get("addons") or []
     spec = d.get("print_spec")
     if spec:
@@ -43,6 +44,19 @@ def _with_ids(items: list[Any]) -> list[dict[str, Any]]:
 
 def _prepare_variants(variants: list[Any]) -> list[dict[str, Any]]:
     return _with_ids(variants)
+
+
+FEATURED_PER_STORE = 3
+
+
+async def _cap_featured(db: Any, store_id: str, product_id: str | None, featured: bool) -> None:
+    if not featured:
+        return
+    query: dict[str, Any] = {"store_id": store_id, "featured": True}
+    if product_id:
+        query["_id"] = {"$ne": product_id}
+    if await db.products.count_documents(query) >= FEATURED_PER_STORE:
+        raise HTTPException(422, "A stall can feature 3 listings. Take one off the home page first.")
 
 
 def _prepare_spec(spec: Any) -> dict[str, Any] | None:
@@ -84,6 +98,7 @@ async def create_product(
     data["print_spec"] = _prepare_spec(body.print_spec)
     if body.kind == "printing":
         data["stock"] = None
+    await _cap_featured(db, store_id, None, bool(data.get("featured")))
     p = {
         "_id": new_id(), "store_id": store_id, "owner_id": user["_id"], **data,
         "published": False,  # listings are always created as drafts
@@ -195,6 +210,8 @@ async def update_product(
     addons = changes["addons"] if "addons" in changes else current.get("addons") or []
     spec = changes["print_spec"] if "print_spec" in changes else current.get("print_spec")
     _check_listing(kind, addons, spec)
+    if "featured" in changes:
+        await _cap_featured(db, current["store_id"], product_id, bool(changes["featured"]))
     for required in ("title", "price_minor", "kind", "listing_type", "category", "available",
                      "description", "variants", "image_urls", "prep_time_min"):
         if required in changes and changes[required] is None:

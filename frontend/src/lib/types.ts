@@ -6,7 +6,7 @@ export interface StoreTheme {
   primary: string; accent: string; background: string
   font: 'modern' | 'serif' | 'rounded'; radius: 'sharp' | 'soft' | 'pill'
 }
-export interface CustomField { id: string; label: string; type: 'text' | 'select' | 'checkbox'; required: boolean; options: string[] }
+export interface CustomField { id: string; label: string; type: 'text' | 'select' | 'checkbox' | 'date'; required: boolean; options: string[] }
 export interface OrderSettings {
   fulfillment_options: ('pickup' | 'campus_meetup')[]; payment_options: ('pay_on_pickup' | 'manual_confirmation' | 'campus_wallet')[]
   slots_enabled: boolean; slots: string[]; slot_required: boolean; slot_days_ahead: number; slot_capacity: number
@@ -42,12 +42,17 @@ export interface Product {
   variants: Variant[]; addons?: Addon[]; print_spec?: PrintSpec | null
   image_urls: string[]; available: boolean; prep_time_min: number
   published: boolean; in_stock: boolean; moderation_status: string; sold_count: number
+  featured?: boolean
   condition?: string | null
+  rate_unit?: 'day' | 'hour' | null
+  max_units?: number | null
 }
 export interface OrderLine {
   product_id: string; variant_id: string | null; title: string; variant_name: string | null
   unit_price_minor: number; quantity: number; line_total_minor: number
   listing_type?: string
+  billed_units?: number
+  rate_unit?: 'day' | 'hour' | null
   addons?: { id: string; name: string; price_minor: number; quantity: number }[]
   print?: {
     file_url: string; pages: number; copies: number; color: 'bw' | 'color'

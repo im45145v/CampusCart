@@ -9,6 +9,7 @@ import AuthPage from '@/pages/Auth'
 import Browse from '@/pages/Browse'
 import Cart from '@/pages/Cart'
 import Home from '@/pages/Home'
+import { HelpPage, PaymentsPage, PrivacyPage, TermsPage } from '@/pages/Legal'
 import Inbox from '@/pages/Inbox'
 import { OrderDetail } from '@/pages/Orders'
 import ProductPage from '@/pages/ProductPage'
@@ -28,6 +29,10 @@ export default function App() {
                 <Route path="stores/:id" element={<StorePage />} />
                 <Route path="products/:id" element={<ProductPage />} />
                 <Route path="cart" element={<Cart />} />
+                <Route path="terms" element={<TermsPage />} />
+                <Route path="privacy" element={<PrivacyPage />} />
+                <Route path="payments" element={<PaymentsPage />} />
+                <Route path="help" element={<HelpPage />} />
                 <Route path="login" element={<AuthPage mode="login" />} />
                 <Route path="register" element={<AuthPage mode="register" />} />
                 <Route path="orders/:id" element={<RequireAuth><OrderDetail /></RequireAuth>} />

@@ -74,7 +74,6 @@ function StoreForm({ store, onSaved }: { store?: Store; onSaved: () => void }) {
       </section>
       <section className={section}>
         <h3 className="text-lg font-bold">Ordering rules</h3>
-        <p className="text-sm text-taupe">Everything buyers see at checkout comes from here.</p>
         <OrderSettingsEditor value={f.order_settings} onChange={(s) => setF({ ...f, order_settings: s })} />
       </section>
       <div className="flex flex-wrap items-center gap-3">
@@ -135,6 +134,7 @@ function formFromDraft(r: Draft) {
     title: d.title ?? '', description: d.description ?? '', kind: d.kind ?? 'product', listing_type: d.listing_type,
     category: d.category ?? 'general', price: d.price_minor !== null ? String(d.price_minor / 100) : '',
     stock: d.stock !== null ? String(d.stock) : '', prep: d.prep_time_min !== null ? String(d.prep_time_min) : '',
+    rate_unit: 'day' as 'day' | 'hour', max_units: '',
   }
 }
 
@@ -143,34 +143,16 @@ function ListingForm({ store, onSaved, incoming }: {
   onSaved: () => void
   incoming: Draft | null
 }) {
-  const empty = { title: '', description: '', kind: 'product', listing_type: store.category === 'lending' ? 'lend' : 'new', category: 'general', price: '', stock: '', prep: '' }
+  const empty = { title: '', description: '', kind: 'product', listing_type: store.category === 'lending' ? 'lend' : 'new', category: 'general', price: '', stock: '', prep: '', rate_unit: 'day' as 'day' | 'hour', max_units: '' }
   const [f, setF] = useState(() => (incoming ? formFromDraft(incoming) : empty))
   const [extras, setExtras] = useState([{ name: '', price: '', max: '1' }])
   const [rates, setRates] = useState({ bw: '1', color: '5', a3: '2', staple: '5', spiral: '20', urgent: '25', copies: '20' })
   const [image, setImage] = useState<string | null>(null)
-  const [aiText, setAiText] = useState('')
-  const [ai, setAi] = useState<{ warnings: string[]; missing: string[] } | null>(
+  const [ai] = useState<{ warnings: string[]; missing: string[] } | null>(
     () => (incoming ? { warnings: incoming.warnings, missing: incoming.missing_fields } : null),
   )
   const [msg, setMsg] = useState<{ tone: 'ok' | 'bad'; text: string } | null>(null)
-  const [busy, setBusy] = useState(false)
 
-  const applyDraft = (r: Draft) => {
-    setF(formFromDraft(r))
-    setAiText('')
-    setAi({ warnings: r.warnings, missing: r.missing_fields })
-  }
-  const draft = async () => {
-    setBusy(true)
-    setMsg(null)
-    try {
-      applyDraft(await api<Draft>('/api/ai/listing-draft', { method: 'POST', body: { text: aiText } }))
-    } catch (e) {
-      setMsg({ tone: 'bad', text: e instanceof Error ? e.message : 'The assistant is unavailable. Fill in the form manually.' })
-    } finally {
-      setBusy(false)
-    }
-  }
   const save = async (e: FormEvent) => {
     e.preventDefault()
     try {
@@ -179,6 +161,7 @@ function ListingForm({ store, onSaved, incoming }: {
         body: {
           title: f.title, description: f.description, kind: f.kind, listing_type: f.listing_type, category: f.category || 'general',
           price_minor: f.kind === 'printing' ? rupeesToMinor(rates.bw) : rupeesToMinor(f.price),
+          ...((f.listing_type === 'lend' || f.listing_type === 'rent') ? { rate_unit: f.rate_unit, max_units: Math.max(1, Math.min(336, Number(f.max_units) || 1)) } : {}),
           stock: f.kind === 'printing' || f.stock === '' ? null : Number(f.stock), prep_time_min: Number(f.prep || 0),
           image_urls: image ? [image] : [],
           addons: f.kind === 'printing' ? [] : extras.filter((e) => e.name.trim()).map((e) => ({
@@ -196,7 +179,6 @@ function ListingForm({ store, onSaved, incoming }: {
       setF(empty)
       setExtras([{ name: '', price: '', max: '1' }])
       setImage(null)
-      setAi(null)
       onSaved()
     } catch (err) {
       setMsg({ tone: 'bad', text: err instanceof Error ? err.message : 'Save failed' })
@@ -205,22 +187,12 @@ function ListingForm({ store, onSaved, incoming }: {
   return (
     <Card className="space-y-4">
       <h3 className="text-lg font-bold">New listing</h3>
-      <div className="space-y-2 rounded-xl bg-ivory p-3">
-        <Field label="Or type another note here" hint="The same rules as the box above: Gemma 4 only fills fields you state.">
-          <Textarea value={aiText} onChange={(e) => setAiText(e.target.value)} placeholder="e.g. selling 10 homemade brownies for 40 rupees each, ready in 30 min" />
-        </Field>
-        <div className="flex flex-wrap items-center gap-2">
-          <Dictation onText={setAiText} />
-          <Button type="button" variant="secondary" size="sm" disabled={busy || aiText.trim().length < 3} onClick={draft}><Sparkles className="h-4 w-4" aria-hidden /> {busy ? 'Working…' : 'Draft with Gemma 4'}</Button>
+      {ai && (ai.warnings.length > 0 || ai.missing.length > 0) && (
+        <div className="space-y-1 text-sm">
+          {ai.warnings.map((w) => <p key={w} className="text-warn">{w}</p>)}
+          {ai.missing.length > 0 && <p className="text-bad">Still needed: {ai.missing.join(', ')}</p>}
         </div>
-        {ai && (
-          <div className="space-y-1 text-sm">
-            {ai.warnings.map((w) => <p key={w} className="text-warn">{w}</p>)}
-            {ai.missing.length > 0 && <p className="text-bad">Please fill in: {ai.missing.join(', ')}</p>}
-            <p className="text-taupe">Review everything below, then save. Nothing is published yet.</p>
-          </div>
-        )}
-      </div>
+      )}
       <form onSubmit={save} className="space-y-3">
         <Field label="Title"><Input required minLength={2} value={f.title} onChange={(e) => setF({ ...f, title: e.target.value })} /></Field>
         <Field label="Description"><Textarea value={f.description} onChange={(e) => setF({ ...f, description: e.target.value })} /></Field>
@@ -228,7 +200,11 @@ function ListingForm({ store, onSaved, incoming }: {
           <Field label="Type"><Select value={f.kind} onChange={(e) => setF({ ...f, kind: e.target.value })}><option value="product">Product</option><option value="service">Service</option><option value="printing">Printing (priced from the file)</option></Select></Field>
           <Field label="Listing"><Select value={f.listing_type} onChange={(e) => setF({ ...f, listing_type: e.target.value })}>{['new', 'secondhand', 'rent', 'lend', 'exchange'].map((c) => <option key={c}>{c}</option>)}</Select></Field>
           <Field label="Category"><Input value={f.category} onChange={(e) => setF({ ...f, category: e.target.value })} /></Field>
-          {f.kind !== 'printing' && <Field label="Price (₹)"><Input required type="number" min={0} step="0.01" value={f.price} onChange={(e) => setF({ ...f, price: e.target.value })} /></Field>}
+          {f.kind !== 'printing' && <Field label={(f.listing_type === 'lend' || f.listing_type === 'rent') ? `₹ per ${f.rate_unit}` : 'Price (₹)'}><Input required type="number" min={0} step="0.01" value={f.price} onChange={(e) => setF({ ...f, price: e.target.value })} /></Field>}
+          {(f.listing_type === 'lend' || f.listing_type === 'rent') && <>
+            <Field label="Charge"><Select value={f.rate_unit} onChange={(e) => setF({ ...f, rate_unit: e.target.value as 'day' | 'hour' })}><option value="day">Per day</option><option value="hour">Per hour</option></Select></Field>
+            <Field label={f.rate_unit === 'hour' ? 'Longest borrow (hours)' : 'Longest borrow (days)'}><Input required type="number" min={1} max={336} value={f.max_units} onChange={(e) => setF({ ...f, max_units: e.target.value })} /></Field>
+          </>}
           <Field label="Stock" hint="Leave empty for unlimited"><Input type="number" min={0} value={f.stock} onChange={(e) => setF({ ...f, stock: e.target.value })} /></Field>
           <Field label="Prep time (min)"><Input type="number" min={0} value={f.prep} onChange={(e) => setF({ ...f, prep: e.target.value })} /></Field>
         </div>
@@ -262,7 +238,7 @@ function ListingForm({ store, onSaved, incoming }: {
   )
 }
 
-function Listings({ store, incoming, formKey }: { store: Store; incoming: Draft | null; formKey: number }) {
+function Listings({ store, incoming, formKey, onDrafted }: { store: Store; incoming: Draft | null; formKey: number; onDrafted: (draft: Draft) => void }) {
   const { data, loading, error, reload } = useFetch<Product[]>(`/api/stores/${store.id}/products`, { include_drafts: true })
   const [err, setErr] = useState('')
   const call = async (path: string, method = 'POST', body?: unknown) => {
@@ -281,6 +257,7 @@ function Listings({ store, incoming, formKey }: { store: Store; incoming: Draft 
   }
   return (
     <div className="space-y-6">
+      <GemmaStudioBar onDrafted={onDrafted} />
       <ListingForm key={formKey} store={store} onSaved={reload} incoming={incoming} />
       {loading ? <Loading /> : error ? <ErrorState message={error} onRetry={reload} /> : !data?.length ? <Empty title="No listings yet" /> : (
         <ul className="space-y-2">
@@ -290,7 +267,7 @@ function Listings({ store, incoming, formKey }: { store: Store; incoming: Draft 
                 <div className="flex items-center gap-3">
                   <div className="h-14 w-14 shrink-0 overflow-hidden rounded-lg bg-ivory">{p.image_urls[0] && <img src={p.image_urls[0]} alt="" referrerPolicy="no-referrer" className="h-full w-full object-cover" />}</div>
                   <div>
-                  <p className="font-semibold">{p.title} <Badge tone={p.published ? 'ok' : 'neutral'}>{p.published ? 'Published' : 'Draft'}</Badge> {p.moderation_status === 'removed' && <Badge tone="bad">Removed by moderators</Badge>}</p>
+                  <p className="font-semibold">{p.title} <Badge tone={p.published ? 'ok' : 'neutral'}>{p.published ? 'Published' : 'Draft'}</Badge> {p.featured && <Badge tone="warn">Featured</Badge>} {p.moderation_status === 'removed' && <Badge tone="bad">Removed by moderators</Badge>}</p>
                   <p className="text-sm text-taupe">{formatMoney(p.price_from_minor)} · {p.stock === null && !p.variants.length ? 'unlimited stock' : `stock ${p.variants.length ? p.variants.map((v) => `${v.name}: ${v.stock ?? '∞'}`).join(', ') : p.stock}`}</p>
                   </div>
                 </div>
@@ -302,6 +279,7 @@ function Listings({ store, incoming, formKey }: { store: Store; incoming: Draft 
                   {p.variants.length === 0 && p.stock !== null && (
                     <label className="text-xs">Stock<Input type="number" min={0} className="ml-1 inline-block w-20" defaultValue={p.stock} onBlur={(e) => void call(`/api/products/${p.id}`, 'PATCH', { stock: Number(e.target.value) })} /></label>
                   )}
+                  <Button variant="secondary" size="sm" onClick={() => call(`/api/products/${p.id}`, 'PATCH', { featured: !p.featured })}>{p.featured ? 'Remove from home' : 'Feature on home'}</Button>
                   <Button variant="secondary" size="sm" onClick={() => call(`/api/products/${p.id}`, 'PATCH', { available: !p.available })}>{p.available ? 'Mark unavailable' : 'Mark available'}</Button>
                   <Button size="sm" variant={p.published ? 'secondary' : 'primary'} onClick={() => call(`/api/products/${p.id}/${p.published ? 'unpublish' : 'publish'}`)}>{p.published ? 'Unpublish' : 'Publish'}</Button>
                 </div>
@@ -318,10 +296,8 @@ function Listings({ store, incoming, formKey }: { store: Store; incoming: Draft 
 function Overview() {
   const { data, loading, error, reload } = useFetch<Summary>('/api/seller/summary')
   const charts = useFetch<SellerCharts>('/api/seller/charts')
-  const [token, setToken] = useState('')
   if (loading) return <Loading />
   if (error || !data) return <ErrorState message={error ?? 'Failed'} onRetry={reload} />
-  const make = async () => setToken((await api<{ token: string }>('/api/seller/api-tokens', { method: 'POST' })).token)
   return (
     <div className="space-y-4">
       <div className="grid gap-4 sm:grid-cols-3">
@@ -338,12 +314,6 @@ function Overview() {
       <Card>
         <h3 className="mb-2 font-bold">Low stock</h3>
         {data.low_stock.length ? <ul className="text-sm">{data.low_stock.map((l, i) => <li key={i}>{l.title}{l.variant ? ` / ${l.variant}` : ''}: <strong>{l.stock}</strong> left</li>)}</ul> : <p className="text-sm text-taupe">Nothing running low.</p>}
-      </Card>
-      <Card className="space-y-2">
-        <h3 className="font-bold">UNO Q assistant token</h3>
-        <p className="text-sm text-taupe">Read-only token for your Arduino UNO Q service. It can view your orders and stock, nothing else. It is shown once.</p>
-        <Button variant="secondary" onClick={make}>Create token</Button>
-        {token && <p className="break-all rounded bg-ivory p-2 font-mono text-xs">{token}</p>}
       </Card>
     </div>
   )
@@ -405,7 +375,6 @@ function SellerOrders({ printing, lending }: { printing: boolean; lending: boole
           {due && <p className="text-sm font-semibold text-forest">Back by {due}</p>}
           {where && <p className="text-sm">Using it at {where}</p>}
           {o.pickup_slot && <p className="text-sm">Hand over {slotText(o.pickup_slot)}</p>}
-          <p className="text-sm text-taupe">Back on the shelf puts the piece up for the next student. The fee stays with you.</p>
           <div className="flex flex-wrap items-center gap-3 text-sm">
             <span className="font-semibold">{o.total_minor ? `${formatMoney(o.total_minor)} fee` : 'Needs a quote'}</span>
             <Link className="text-terracotta underline" to={`/orders/${o.id}`}>Full order</Link>
@@ -522,7 +491,7 @@ function GemmaStudioBar({ onDrafted }: { onDrafted: (draft: Draft) => void }) {
     setMsg(null)
     try {
       onDrafted(await api<Draft>('/api/ai/listing-draft', { method: 'POST', body: { text: note } }))
-      setMsg({ tone: 'ok', text: 'Draft applied in Listings. Review every field, then save. Nothing is published yet.' })
+      setMsg({ tone: 'ok', text: 'Draft is in the listing form. Check it, then save.' })
     } catch (e) {
       setMsg({ tone: 'bad', text: e instanceof Error ? e.message : 'The assistant is unavailable. Fill in the listing form manually.' })
     } finally {
@@ -533,7 +502,7 @@ function GemmaStudioBar({ onDrafted }: { onDrafted: (draft: Draft) => void }) {
     <section className="space-y-3 rounded-2xl border border-line bg-card p-5" aria-labelledby="gemma-draft">
       <div>
         <h2 id="gemma-draft" className="text-lg font-bold">Draft with Gemma 4</h2>
-        <p className="mt-1 text-sm text-taupe">Gemma 4 only fills fields you state. It never invents a price or stock, and it never publishes.</p>
+        <p className="mt-1 text-sm text-taupe">Say the price and the stock. The draft stays here until you save it.</p>
       </div>
       <Field label="Describe the listing in your own words">
         <Textarea value={text} onChange={(e) => setText(e.target.value)} placeholder={SAMPLE_LISTING_NOTE} />
@@ -598,17 +567,13 @@ export default function Seller() {
           <Button size="sm" onClick={async () => { await api(`/api/stores/${store.id}/resubmit`, { method: 'POST' }); await stores.reload() }}>Submit again</Button>
         </div>
       )}
-      <GemmaStudioBar onDrafted={(draft) => { setIncoming(draft); setFormKey((n) => n + 1); setTab('Listings') }} />
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <h2 className="text-xl font-extrabold">Seller Studio</h2>
-        {stores.data && stores.data.length > 1 && <Select aria-label="Choose store" className="w-48" value={idx} onChange={(e) => setIdx(Number(e.target.value))}>{stores.data.map((s, i) => <option key={s.id} value={i}>{s.name}</option>)}</Select>}
-      </div>
+      {stores.data && stores.data.length > 1 && <Select aria-label="Choose store" className="w-48" value={idx} onChange={(e) => setIdx(Number(e.target.value))}>{stores.data.map((s, i) => <option key={s.id} value={i}>{s.name}</option>)}</Select>}
       <div role="tablist" className="flex flex-wrap gap-1 border-b border-line">
         {TABS.map((t) => <button key={t} role="tab" aria-selected={tab === t} onClick={() => setTab(t)} className={cn('rounded-t-lg px-4 py-2 text-sm font-semibold', tab === t ? 'bg-forest text-white' : 'text-forest hover:bg-forest/10')}>{t === 'Orders' && store.category === 'printing' ? 'Print queue' : t === 'Orders' && store.category === 'lending' ? 'Loans' : t}</button>)}
         <Link className="ml-auto px-3 py-2 text-sm text-terracotta underline" to="/inbox">Messages</Link>
       </div>
       {tab === 'Overview' && <Overview />}
-      {tab === 'Listings' && <Listings store={store} incoming={incoming} formKey={formKey} />}
+      {tab === 'Listings' && <Listings store={store} incoming={incoming} formKey={formKey} onDrafted={(draft) => { setIncoming(draft); setFormKey((n) => n + 1); setTab('Listings') }} />}
       {tab === 'Orders' && <SellerOrders printing={store.category === 'printing'} lending={store.category === 'lending'} />}
       {tab === 'Plans' && (plans.loading ? <Loading /> : (
         <div className="space-y-4">

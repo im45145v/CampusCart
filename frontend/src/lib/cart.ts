@@ -11,6 +11,9 @@ export interface CartLine {
   title: string; variantName: string | null; unitPriceMinor: number; quantity: number
   addons?: CartAddon[]
   printJob?: CartPrintJob | null
+  listingType?: string
+  rateUnit?: 'day' | 'hour' | null
+  maxUnits?: number | null
 }
 
 const KEY = 'campuscart.cart'
@@ -36,11 +39,48 @@ export function setQuantity(cart: CartLine[], key: string, quantity: number): Ca
   return cart.map((l) => (lineKey(l) === key ? { ...l, quantity: Math.min(quantity, MAX_QTY) } : l))
 }
 
+function dayStamp(iso: string): number {
+  const [year, month, day] = iso.split('-').map(Number)
+  return new Date(year, month - 1, day).getTime()
+}
+
+function minutes(hhmm: string): number {
+  const [hour, minute] = hhmm.slice(0, 5).split(':').map(Number)
+  return hour * 60 + minute
+}
+
+/** Days or hours from collect to return. Matches the server. The server still prices the order. */
+export function borrowUnits(input: {
+  unit: 'day' | 'hour'
+  collectOn: string
+  returnOn: string
+  slotLabel?: string
+  returnTime?: string
+  maxUnits?: number | null
+}): { units: number; error: string } {
+  if (!input.collectOn || !input.returnOn) return { units: 0, error: '' }
+  const cap = input.maxUnits ?? null
+  if (input.unit === 'day') {
+    const span = Math.round((dayStamp(input.returnOn) - dayStamp(input.collectOn)) / 86_400_000)
+    if (span < 0) return { units: 0, error: 'Bring it back on or after the day you collect it' }
+    const units = Math.max(1, span)
+    if (cap && units > cap) return { units: 0, error: `At most ${cap} days` }
+    return { units, error: '' }
+  }
+  if (!input.slotLabel || !input.returnTime) return { units: 0, error: '' }
+  const start = dayStamp(input.collectOn) + minutes(input.slotLabel) * 60_000
+  const end = dayStamp(input.returnOn) + minutes(input.returnTime) * 60_000
+  if (end <= start) return { units: 0, error: 'Bring it back after you collect it' }
+  const units = Math.max(1, Math.ceil((end - start) / 3_600_000))
+  if (cap && units > cap) return { units: 0, error: `At most ${cap} hours` }
+  return { units, error: '' }
+}
+
 /** Display-only estimate. The server recalculates every price at checkout. */
-export function lineEstimate(l: CartLine): number {
+export function lineEstimate(l: CartLine, units = 1): number {
   if (l.printJob) return l.printJob.totalMinor
   const extra = (l.addons ?? []).reduce((sum, a) => sum + a.priceMinor * a.quantity, 0)
-  return (l.unitPriceMinor + extra) * l.quantity
+  return (l.unitPriceMinor * Math.max(1, units) + extra) * l.quantity
 }
 
 export function estimateTotal(lines: CartLine[]): number {
