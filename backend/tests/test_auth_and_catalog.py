@@ -83,7 +83,30 @@ async def test_home_payload(client: httpx.AsyncClient, seller: Actor, store: dic
     h = (await client.get("/api/home")).json()
     assert h["featured_stores"][0]["id"] == store["id"]
     assert len(h["popular_products"]) == 1
+    assert h["featured_products"] == []
+    assert len(h["latest_products"]) == 1
+    assert h["category_rails"][0]["slug"] == "food"
     assert {c["slug"] for c in h["categories"]} >= {"food", "printing"}
+
+
+async def test_a_stall_can_feature_three_listings(
+    client: httpx.AsyncClient, seller: Actor, store: dict[str, Any]
+) -> None:
+    for i in range(3):
+        made = await make_product(client, seller, store, title=f"Featured {i}", featured=True)
+        assert made["featured"] is True
+    plain = await make_product(client, seller, store, title="Everyday samosa")
+    blocked = await client.post(
+        f"/api/stores/{store['id']}/products",
+        headers=seller.headers,
+        json={"title": "One too many", "price_minor": 100, "stock": 1, "category": "snacks", "featured": True},
+    )
+    assert blocked.status_code == 422
+    h = (await client.get("/api/home")).json()
+    titles = {p["title"] for p in h["featured_products"]}
+    assert titles == {"Featured 0", "Featured 1", "Featured 2"}
+    assert plain["title"] in {p["title"] for p in h["latest_products"]}
+    assert plain["title"] not in titles
 
 
 async def test_saved_stores(client: httpx.AsyncClient, buyer: Actor, store: dict[str, Any]) -> None:

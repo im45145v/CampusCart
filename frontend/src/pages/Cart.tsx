@@ -7,10 +7,10 @@ import { Card } from '@/components/ui/card'
 import { Field, Input, Select, Textarea } from '@/components/ui/input'
 import { api } from '@/lib/api'
 import { useAuth } from '@/lib/auth'
-import { estimateTotal, groupByStore, lineEstimate, lineKey, type CartLine } from '@/lib/cart'
+import { borrowUnits, groupByStore, lineEstimate, lineKey, type CartLine } from '@/lib/cart'
 import { useCart } from '@/lib/cartContext'
 import { themeStyle } from '@/lib/theme'
-import { cn, formatMoney } from '@/lib/utils'
+import { cn, formatMoney, paysUpfront } from '@/lib/utils'
 import { useFetch } from '@/lib/useFetch'
 import type { Order, OrderOptions, Store, VoucherQuote } from '@/lib/types'
 
@@ -22,19 +22,18 @@ const PAYMENT_LABEL = {
 }
 
 function SlotPicker({ opts, value, onChange }: { opts: OrderOptions; value: string; onChange: (v: string) => void }) {
-  const [day, setDay] = useState(opts.days.find((d) => d.slots.some((s) => s.available))?.date ?? opts.days[0]?.date)
+  const open = opts.days.find((d) => d.slots.some((s) => s.available))?.date ?? opts.days[0]?.date ?? ''
+  const [day, setDay] = useState(value.split('|')[0] || open)
   const current = opts.days.find((d) => d.date === day)
+  const pickDay = (next: string) => {
+    setDay(next)
+    onChange('')
+  }
   return (
     <fieldset className="space-y-2">
-      <legend className="text-sm font-medium text-forest">Pickup time {opts.slot_required ? '' : '(optional)'}</legend>
-      <div className="flex flex-wrap gap-2" role="tablist" aria-label="Pickup day">
-        {opts.days.map((d, i) => (
-          <button key={d.date} type="button" role="tab" aria-selected={d.date === day} onClick={() => setDay(d.date)}
-            className={cn('rounded-lg border px-3 py-1.5 text-sm', d.date === day ? 'border-terracotta bg-terracotta text-white' : 'border-line bg-white')}>
-            {i === 0 ? 'Today' : i === 1 ? 'Tomorrow' : new Date(`${d.date}T00:00:00`).toLocaleDateString(undefined, { weekday: 'short', day: 'numeric', month: 'short' })}
-          </button>
-        ))}
-      </div>
+      <Field label={`Collect on${opts.slot_required ? '' : ' (optional)'}`}>
+        <Input type="date" min={opts.days[0]?.date} max={opts.days[opts.days.length - 1]?.date} value={day} onChange={(e) => pickDay(e.target.value)} />
+      </Field>
       <div className="flex flex-wrap gap-2">
         {current?.slots.map((s) => {
           const key = `${current.date}|${s.label}`
@@ -47,6 +46,7 @@ function SlotPicker({ opts, value, onChange }: { opts: OrderOptions; value: stri
             </button>
           )
         })}
+        {day && !current && <p className="text-sm text-warn">That day is not open.</p>}
       </div>
     </fieldset>
   )
@@ -61,6 +61,8 @@ function StoreCheckout({ storeId, lines }: { storeId: string; lines: CartLine[] 
   const [fulfillmentPick, setFulfillment] = useState('')
   const [paymentPick, setPayment] = useState('')
   const [slot, setSlot] = useState('')
+  const [returnOn, setReturnOn] = useState('')
+  const [returnTime, setReturnTime] = useState('')
   const [answers, setAnswers] = useState<Record<string, string>>({})
   const [note, setNote] = useState('')
   const [details, setDetails] = useState('')
@@ -74,9 +76,22 @@ function StoreCheckout({ storeId, lines }: { storeId: string; lines: CartLine[] 
   const fulfillment = opts && opts.fulfillment_options.includes(fulfillmentPick as never) ? fulfillmentPick : opts?.fulfillment_options[0] ?? 'pickup'
   const payment = opts && opts.payment_options.includes(paymentPick as never) ? paymentPick : opts?.payment_options[0] ?? 'pay_on_pickup'
   const maxQty = opts?.max_qty_per_item ?? 99
-  const missing = opts?.custom_fields.filter((f) => f.required && (answers[f.id] ?? '') === '' ) ?? []
+  const rated = lines.some((l) => l.rateUnit === 'day' || l.rateUnit === 'hour')
+  const hourly = lines.some((l) => l.rateUnit === 'hour')
+  const collectOn = slot.split('|')[0] ?? ''
+  const slotLabel = slot.split('|')[1] ?? ''
+  const answered = { ...answers }
+  if (returnOn && opts?.custom_fields.some((f) => f.id === 'return_by')) answered.return_by = returnOn
+  const missing = opts?.custom_fields.filter((f) => f.required && f.id !== 'return_by' && (answered[f.id] ?? '') === '') ?? []
   const slotMissing = !!opts?.slots_enabled && opts.slot_required && !slot
-  const estimate = estimateTotal(lines)
+  const returnMissing = rated && !returnOn
+  const timeMissing = hourly && !!returnOn && !returnTime
+  const charges = lines.map((l) => {
+    if (!l.rateUnit) return { units: 1, error: '' }
+    return borrowUnits({ unit: l.rateUnit, collectOn, returnOn, slotLabel, returnTime, maxUnits: l.maxUnits })
+  })
+  const rateError = charges.find((c) => c.error)?.error ?? ''
+  const estimate = lines.reduce((sum, l, i) => sum + lineEstimate(l, l.rateUnit ? charges[i].units : 1), 0)
   const itemBody = lines.map((l) => ({
     product_id: l.productId, variant_id: l.variantId, quantity: l.quantity,
     addons: (l.addons ?? []).map((a) => ({ id: a.id, quantity: a.quantity })),
@@ -92,8 +107,14 @@ function StoreCheckout({ storeId, lines }: { storeId: string; lines: CartLine[] 
     setCodeError('')
     setOffer(null)
     try {
+      const [date, label] = slot.split('|')
       setOffer(await api<VoucherQuote>('/api/vouchers/preview', {
-        method: 'POST', body: { store_id: storeId, code, payment_method: payment, items: itemBody },
+        method: 'POST', body: {
+          store_id: storeId, code, payment_method: payment, items: itemBody,
+          ...(slot ? { pickup_slot: { date, label } } : {}),
+          ...(returnOn ? { return_on: returnOn } : {}),
+          ...(returnTime ? { return_time: returnTime } : {}),
+        },
       }))
     } catch (e) {
       setCodeError(e instanceof Error ? e.message : 'That code does not apply')
@@ -111,7 +132,10 @@ function StoreCheckout({ storeId, lines }: { storeId: string; lines: CartLine[] 
         body: {
           store_id: storeId, fulfillment, payment_method: payment, note, request_details: details,
           ...(code.trim() ? { voucher_code: code.trim() } : {}),
-          ...(slot ? { pickup_slot: { date, label } } : {}), answers,
+          ...(slot ? { pickup_slot: { date, label } } : {}),
+          ...(returnOn ? { return_on: returnOn } : {}),
+          ...(returnTime ? { return_time: returnTime } : {}),
+          answers: answered,
           items: itemBody,
         },
       })
@@ -131,7 +155,7 @@ function StoreCheckout({ storeId, lines }: { storeId: string; lines: CartLine[] 
       {options.loading && !opts && <Loading />}
       {opts?.order_instructions && <Notice tone="ok">{opts.order_instructions}</Notice>}
       <ul className="divide-y divide-line">
-        {lines.map((l) => (
+        {lines.map((l, i) => (
           <li key={lineKey(l)} className="flex items-center justify-between gap-3 py-2">
             <div>
               <p className="font-medium">{l.title}</p>
@@ -142,7 +166,11 @@ function StoreCheckout({ storeId, lines }: { storeId: string; lines: CartLine[] 
             <div className="flex items-center gap-2">
               {!l.printJob && <><label className="sr-only" htmlFor={`q-${lineKey(l)}`}>Quantity for {l.title}</label>
               <Input id={`q-${lineKey(l)}`} type="number" min={1} max={maxQty} className="w-20" value={l.quantity} onChange={(e) => cart.setQty(lineKey(l), Math.min(maxQty, Number(e.target.value) || 1))} /></>}
-              <span className="w-24 text-right">{formatMoney(lineEstimate(l))}</span>
+              <span className="w-28 text-right text-sm">
+                {l.rateUnit && charges[i].units > 0
+                  ? `${formatMoney(l.unitPriceMinor)} / ${l.rateUnit} × ${charges[i].units}`
+                  : l.rateUnit ? `${formatMoney(l.unitPriceMinor)} / ${l.rateUnit}` : formatMoney(lineEstimate(l))}
+              </span>
               <Button variant="ghost" size="sm" aria-label={`Remove ${l.title}`} onClick={() => cart.setQty(lineKey(l), 0)}><Trash2 className="h-4 w-4" aria-hidden /></Button>
             </div>
           </li>
@@ -153,14 +181,28 @@ function StoreCheckout({ storeId, lines }: { storeId: string; lines: CartLine[] 
         <>
           <div className="grid gap-3 sm:grid-cols-2">
             <Field label="Fulfilment"><Select value={fulfillment} onChange={(e) => setFulfillment(e.target.value)}>{opts.fulfillment_options.map((o) => <option key={o} value={o}>{FULFILMENT_LABEL[o]}</option>)}</Select></Field>
-            <Field label="Payment" hint="Campus wallet spends credits you added yourself. Pay on pickup and direct pay are confirmed by the seller. Nothing here verifies UPI.">
-              <Select value={payment} onChange={(e) => setPayment(e.target.value)}>{opts.payment_options.map((o) => <option key={o} value={o}>{PAYMENT_LABEL[o]}</option>)}</Select>
-            </Field>
+            {paysUpfront(opts.payment_options) ? (
+              <p className="text-sm sm:col-span-2">Pay upfront with campus credits. This stall does not take cash when you collect. The credits leave your balance when you place the order, and come back if the order is cancelled or rejected.</p>
+            ) : (
+              <Field label="Payment" hint="Campus credits, or cash the seller confirms. This is not a bank payment.">
+                <Select value={payment} onChange={(e) => setPayment(e.target.value)}>{opts.payment_options.map((o) => <option key={o} value={o}>{PAYMENT_LABEL[o]}</option>)}</Select>
+              </Field>
+            )}
           </div>
           {opts.slots_enabled && <SlotPicker opts={opts} value={slot} onChange={setSlot} />}
-          {opts.custom_fields.map((f) => (
+          {rated && (
+            <div className="grid gap-3 sm:grid-cols-2">
+              <Field label="Bring it back on *" hint="The fee is the listing rate for each day or hour, and it stops at the longest borrow on that listing.">
+                <Input type="date" required min={collectOn || undefined} value={returnOn} onChange={(e) => setReturnOn(e.target.value)} />
+              </Field>
+              {hourly && <Field label="Bring it back at *"><Input type="time" required value={returnTime} onChange={(e) => setReturnTime(e.target.value)} /></Field>}
+            </div>
+          )}
+          {opts.custom_fields.filter((f) => !(rated && f.id === 'return_by')).map((f) => (
             <div key={f.id}>
-              {f.type === 'checkbox' ? (
+              {f.type === 'date' ? (
+                <Field label={`${f.label}${f.required ? ' *' : ''}`}><Input type="date" value={answers[f.id] ?? ''} onChange={(e) => setAnswers({ ...answers, [f.id]: e.target.value })} /></Field>
+              ) : f.type === 'checkbox' ? (
                 <label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={answers[f.id] === 'yes'} onChange={(e) => setAnswers({ ...answers, [f.id]: e.target.checked ? 'yes' : '' })} /> {f.label}{f.required && ' *'}</label>
               ) : f.type === 'select' ? (
                 <Field label={`${f.label}${f.required ? ' *' : ''}`}><Select value={answers[f.id] ?? ''} onChange={(e) => setAnswers({ ...answers, [f.id]: e.target.value })}><option value="">Choose…</option>{f.options.map((o) => <option key={o}>{o}</option>)}</Select></Field>
@@ -174,7 +216,7 @@ function StoreCheckout({ storeId, lines }: { storeId: string; lines: CartLine[] 
         </>
       )}
       <div className="flex flex-wrap items-end gap-2">
-        <Field label="Promo code" hint="The server checks first-order, new-account, minimum, and category rules. A code does not apply to an order that still needs a quote.">
+        <Field label="Promo code">
           <Input value={code} maxLength={16} className="uppercase" onChange={(e) => { setCode(e.target.value); setOffer(null); setCodeError('') }} placeholder="FIRSTBITE" />
         </Field>
         <Button type="button" variant="secondary" disabled={!code.trim()} onClick={() => void checkCode()}>Check code</Button>
@@ -182,12 +224,15 @@ function StoreCheckout({ storeId, lines }: { storeId: string; lines: CartLine[] 
       {offer && <Notice tone="ok">{offer.message} {offer.membership_discount_minor > 0 ? `Membership already took ${formatMoney(offer.membership_discount_minor)}.` : ''} You pay {formatMoney(offer.payable_minor)}.</Notice>}
       {codeError && <Notice tone="bad">{codeError}</Notice>}
       <Field label="Note to seller (optional)"><Input value={note} maxLength={1000} onChange={(e) => setNote(e.target.value)} /></Field>
-      <Field label="Request details (optional)" hint={lines.some((l) => l.printJob) ? 'Priced print jobs already include the file and the breakdown. Add anything the desk should know.' : 'Printing without a rate card still gets a manual quote from the seller.'}><Textarea value={details} maxLength={3000} onChange={(e) => setDetails(e.target.value)} /></Field>
+      {lines.some((l) => l.printJob) && <Field label="Note for the print desk (optional)"><Textarea value={details} maxLength={3000} onChange={(e) => setDetails(e.target.value)} /></Field>}
       <div className="flex flex-wrap items-center justify-between gap-2">
-        <p>Estimated total <strong>{formatMoney(offer?.payable_minor ?? estimate)}</strong> <span className="text-xs text-taupe">(final price is calculated by the server{offer ? `, code ${offer.code} included` : ''})</span></p>
-        <Button size="lg" disabled={busy || !opts || slotMissing || missing.length > 0} onClick={place}>{busy ? 'Placing…' : 'Place order'}</Button>
+        <p>Total <strong>{formatMoney(offer?.payable_minor ?? estimate)}</strong></p>
+        <Button size="lg" disabled={busy || !opts || slotMissing || missing.length > 0 || returnMissing || timeMissing || !!rateError} onClick={place}>{busy ? 'Placing…' : 'Place order'}</Button>
       </div>
       {slotMissing && <p className="text-sm text-warn">Choose a pickup time to continue.</p>}
+      {returnMissing && <p className="text-sm text-warn">Choose the day you will bring it back.</p>}
+      {timeMissing && <p className="text-sm text-warn">Choose the time you will bring it back.</p>}
+      {rateError && <p className="text-sm text-warn">{rateError}</p>}
       {missing.length > 0 && <p className="text-sm text-warn">Please answer: {missing.map((m) => m.label).join(', ')}</p>}
       {options.error && <Notice tone="bad">{options.error}</Notice>}
       {error && <Notice tone="bad">{error}</Notice>}
@@ -198,12 +243,13 @@ function StoreCheckout({ storeId, lines }: { storeId: string; lines: CartLine[] 
 
 export default function Cart() {
   const { lines } = useCart()
-  if (lines.length === 0) return <Empty title="Your cart is empty"><Button asChild><Link to="/browse">Browse the marketplace</Link></Button></Empty>
+  const groups = groupByStore(lines)
+  if (lines.length === 0) return <Empty title="Your cart is empty"><Button asChild><Link to="/browse">Browse the stalls</Link></Button></Empty>
   return (
     <div className="space-y-6">
-      <h1 className="text-2xl font-extrabold">Cart & checkout</h1>
-      <p className="text-sm text-taupe">Each store receives its own order.</p>
-      {[...groupByStore(lines)].map(([storeId, ls]) => <StoreCheckout key={storeId} storeId={storeId} lines={ls} />)}
+      <h1 className="text-2xl font-extrabold">Cart</h1>
+      {groups.size > 1 && <p className="text-sm text-taupe">Each stall gets its own order.</p>}
+      {[...groups].map(([storeId, ls]) => <StoreCheckout key={storeId} storeId={storeId} lines={ls} />)}
     </div>
   )
 }

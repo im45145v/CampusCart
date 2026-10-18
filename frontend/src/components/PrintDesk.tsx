@@ -85,7 +85,7 @@ export function PrintDesk({ product, onAdd, disabled = false }: { product: Produ
 
   return (
     <div className="space-y-3 rounded-2xl border border-line bg-card p-3">
-      <p className="text-sm text-taupe">Upload the file first. We count the pages, then the price follows the rate card. The seller receives the file and this breakdown.</p>
+      <p className="text-sm text-taupe">Upload the file. The price follows the stall’s rate card.</p>
       <Field label="File" hint="PDF, PNG, JPEG, or WebP. Up to 2 MB. Password-protected PDFs are refused.">
         <Input type="file" accept="application/pdf,image/png,image/jpeg,image/webp" onChange={(e) => void upload(e.target.files)} />
       </Field>

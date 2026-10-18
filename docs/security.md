@@ -2,7 +2,7 @@
 
 - Passwords: bcrypt. JWT secret from `JWT_SECRET`; the app refuses to start in production with the dev default.
 - RBAC and ownership are checked server-side on every route. Non-parties get 404 for orders and conversations.
-- Never trusted from clients: prices, totals, order status, sender id, roles (request models forbid extra fields).
+- Never trusted from clients: prices, totals, order status, sender id, roles (request models forbid extra fields). A payment method is accepted only when that stall enabled it.
 - Search input is regex-escaped. Uploads are content-sniffed, size-limited and renamed with random ids.
 - Rate limits: auth, reports, AI and speech endpoints (per IP) and chat (per user). In-memory, per process.
 - WebSocket: single-use short-lived ticket, Origin check, membership check per message, size limits, persisted before ack.

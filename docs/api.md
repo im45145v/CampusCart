@@ -32,13 +32,16 @@ and `order_settings`. `PATCH` merges partial `theme`/`order_settings`; `banner_u
 
 `order_settings` is enforced by the server in `services/orders.py`: allowed `fulfillment_options` and `payment_options`,
 `max_qty_per_item`, `min_order_minor` (quote-based printing is exempt), buyer-facing `custom_fields` (text, select,
-checkbox; `required` honoured), and optional pickup time slots (`slots` as `HH:MM-HH:MM`, `slot_days_ahead`,
-`slot_capacity`, `utc_offset_min`, default 330 = IST). Orders then accept `pickup_slot: {date, label}` and
+checkbox, date; `required` honoured), and optional pickup time slots (`slots` as `HH:MM-HH:MM`, `slot_days_ahead`,
+`slot_capacity`, `utc_offset_min`, default 330 = IST). Orders then accept `pickup_slot: {date, label}`,
+`collect_on`, `return_on`, and `return_time` (for a daily or hourly borrow rate), and
 `answers: {field_id: value}`, and store `pickup_slot`, `answers` and `est_wait_min`
 (`lead_time_min` + `queue_min_per_order` per open order + the slowest item's `prep_time_min`).
+A product may set `featured: true`. The server allows three featured listings per stall, including drafts, and returns 422 after that. `GET /home` returns `featured_products` (published and featured), `latest_products` (newest published listings that are not already featured), `popular_products`, `featured_stores`, and `category_rails` for food, printing, and lending. Featuring does not charge the stall and does not expire.
+
 `GET /stores/{id}/order-options` returns the settings plus live slot availability for the checkout UI.
-`payment_options` may include `campus_wallet`. That method debits the buyer's campus-wallet balance when the
-catalogue total is known, or when the buyer accepts a quote. Cancel and reject credit it back once. Completing the
+`payment_options` is chosen by the stall and rejected if the order uses another method. `campus_wallet` debits the buyer's campus-wallet balance when the
+catalogue total is known, or when the buyer accepts a quote. A stall that lists only `campus_wallet` is pay upfront: cash at collection is not offered. Cancel and reject credit the debit back once, including after the seller has accepted the order. Completing the
 order credits the seller the same amount. `POST /orders/{id}/confirm-payment` rejects a wallet-paid order.
 `POST /me/wallet/add` records a campus-ledger top-up (₹10–₹2,000, ₹5,000 per UTC day) and does not verify UPI.
 `POST /me/wallet/remove` debits a payout request that staff later mark paid or return.

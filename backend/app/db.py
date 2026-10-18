@@ -35,6 +35,7 @@ async def ensure_indexes(db: Database) -> None:
     await db.products.create_index([("store_id", 1), ("published", 1)])
     await db.products.create_index([("category", 1), ("price_minor", 1)])
     await db.products.create_index("sold_count")
+    await db.products.create_index([("featured", 1), ("published", 1)])
     await db.orders.create_index([("buyer_id", 1), ("created_at", -1)])
     await db.orders.create_index([("seller_id", 1), ("status", 1), ("created_at", -1)])
     await db.conversations.create_index("participants")

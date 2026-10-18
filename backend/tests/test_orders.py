@@ -1,4 +1,5 @@
 import asyncio
+from datetime import date, timedelta
 from typing import Any
 
 import httpx
@@ -169,3 +170,82 @@ async def test_seller_summary_and_edge_tools(
     assert summary["orders_by_status"] == {"placed": 1}
     await client.delete(f"/api/seller/api-tokens/{tok['id']}", headers=seller.headers)
     assert (await client.get("/api/edge/pending-orders", headers=h)).status_code == 401
+
+
+async def test_returned_borrow_goes_back_on_the_shelf(
+    client: httpx.AsyncClient, seller: Actor, buyer: Actor, store: dict[str, Any]
+) -> None:
+    lent = await make_product(
+        client, seller, store, title="Projector", listing_type="lend", stock=1, price_minor=8000,
+    )
+    sold = await make_product(client, seller, store, title="Plate", stock=1, price_minor=1500)
+    borrow = await place(client, buyer, store, [{"product_id": lent["id"], "quantity": 1}])
+    assert borrow.status_code == 201, borrow.text
+    assert await stock_of(client, lent["id"]) == 0
+    sale = await place(client, buyer, store, [{"product_id": sold["id"], "quantity": 1}])
+    assert sale.status_code == 201
+    for status in ("accepted", "preparing", "ready", "completed"):
+        done = await client.post(
+            f"/api/orders/{borrow.json()['id']}/status", headers=seller.headers, json={"status": status},
+        )
+        assert done.status_code == 200, done.text
+    assert await stock_of(client, lent["id"]) == 1
+    for status in ("accepted", "preparing", "ready", "completed"):
+        done = await client.post(
+            f"/api/orders/{sale.json()['id']}/status", headers=seller.headers, json={"status": status},
+        )
+        assert done.status_code == 200, done.text
+    assert await stock_of(client, sold["id"]) == 0
+
+
+async def test_daily_rate_uses_the_dates_and_stops_at_the_listing_cap(
+    client: httpx.AsyncClient, seller: Actor, buyer: Actor, store: dict[str, Any]
+) -> None:
+    p = await make_product(
+        client, seller, store, title="Drill", listing_type="lend", stock=2,
+        price_minor=1000, rate_unit="day", max_units=2,
+    )
+    today = date.today()
+    ok = await place(
+        client, buyer, store, [{"product_id": p["id"], "quantity": 1}],
+        collect_on=today.isoformat(), return_on=(today + timedelta(days=2)).isoformat(),
+    )
+    assert ok.status_code == 201, ok.text
+    body = ok.json()
+    assert body["items"][0]["billed_units"] == 2
+    assert body["total_minor"] == 2000
+    over = await place(
+        client, buyer, store, [{"product_id": p["id"], "quantity": 1}],
+        collect_on=today.isoformat(), return_on=(today + timedelta(days=3)).isoformat(),
+    )
+    assert over.status_code == 422
+
+
+async def test_hourly_rate_counts_from_the_handover(
+    client: httpx.AsyncClient, seller: Actor, buyer: Actor, store: dict[str, Any]
+) -> None:
+    settings = await client.patch(
+        f"/api/stores/{store['id']}", headers=seller.headers,
+        json={"order_settings": {
+            "fulfillment_options": ["pickup"], "payment_options": ["pay_on_pickup"],
+            "slots_enabled": True, "slots": ["12:00-14:00"], "slot_required": True, "slot_days_ahead": 2,
+        }},
+    )
+    assert settings.status_code == 200, settings.text
+    p = await make_product(
+        client, seller, store, title="Speaker", listing_type="lend", stock=1,
+        price_minor=500, rate_unit="hour", max_units=6,
+    )
+    day = (date.today() + timedelta(days=1)).isoformat()
+    ok = await place(
+        client, buyer, store, [{"product_id": p["id"], "quantity": 1}],
+        pickup_slot={"date": day, "label": "12:00-14:00"}, return_on=day, return_time="18:00",
+    )
+    assert ok.status_code == 201, ok.text
+    assert ok.json()["items"][0]["billed_units"] == 6
+    assert ok.json()["total_minor"] == 3000
+    over = await place(
+        client, buyer, store, [{"product_id": p["id"], "quantity": 1}],
+        pickup_slot={"date": day, "label": "12:00-14:00"}, return_on=day, return_time="20:00",
+    )
+    assert over.status_code == 422

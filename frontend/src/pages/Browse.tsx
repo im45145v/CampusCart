@@ -4,7 +4,7 @@ import { Empty, ErrorState, Loading } from '@/components/States'
 import { Field, Input, Select } from '@/components/ui/input'
 import { rupeesToMinor } from '@/lib/utils'
 import { useFetch } from '@/lib/useFetch'
-import type { Product, Store } from '@/lib/types'
+import { STORE_CATEGORIES, type Product, type Store } from '@/lib/types'
 
 export default function Browse() {
   const [sp, setSp] = useSearchParams()
@@ -33,7 +33,7 @@ export default function Browse() {
         <Field label="Category">
           <Select value={category} onChange={(e) => set('category', e.target.value)}>
             <option value="">All</option>
-            {['food', 'printing', 'handmade', 'goods', 'services'].map((c) => <option key={c}>{c}</option>)}
+            {STORE_CATEGORIES.map((c) => <option key={c}>{c}</option>)}
           </Select>
         </Field>
         <Field label="Max price (₹)"><Input type="number" min={0} value={max} onChange={(e) => set('max', e.target.value)} /></Field>

@@ -1,5 +1,6 @@
+import math
 from collections import OrderedDict
-from datetime import timedelta
+from datetime import datetime, time, timedelta
 from typing import Any
 
 from fastapi import HTTPException
@@ -158,6 +159,11 @@ def _check_answers(cfg: OrderSettings, answers: dict[str, str]) -> list[dict[str
             v = "yes" if v.lower() in ("yes", "true", "1") else ""
         elif f.type == "select" and v and v not in f.options:
             raise HTTPException(422, f"Invalid choice for {f.label}")
+        elif f.type == "date" and v:
+            try:
+                datetime.strptime(v, "%Y-%m-%d")
+            except ValueError:
+                raise HTTPException(422, f"{f.label} must be a date") from None
         if f.required and not v:
             raise HTTPException(422, f"{f.label} is required")
         if v:
@@ -197,8 +203,44 @@ def _order_files(extra: list[str], lines: list[dict[str, Any]]) -> list[str]:
     return urls[:5]
 
 
+def borrow_units(
+    product: dict[str, Any],
+    collect_on: Any,
+    return_on: Any,
+    slot_label: str | None,
+    return_time: str | None,
+) -> int:
+    """Days or hours between collect and return, capped by the listing."""
+    unit = product.get("rate_unit")
+    if unit not in ("day", "hour"):
+        return 1
+    title = str(product.get("title") or "This item")
+    if collect_on is None or return_on is None:
+        raise HTTPException(422, f"Choose the day you collect {title} and the day you bring it back")
+    cap = int(product["max_units"]) if product.get("max_units") else None
+    if unit == "day":
+        span = (return_on - collect_on).days
+        if span < 0:
+            raise HTTPException(422, f"Bring {title} back on or after the day you collect it")
+        units = max(1, span)
+        if cap and units > cap:
+            raise HTTPException(422, f"{title} can be borrowed for at most {cap} days")
+        return units
+    if not slot_label or not return_time:
+        raise HTTPException(422, f"Choose a handover time and the time you will bring {title} back")
+    start = datetime.combine(collect_on, time.fromisoformat(slot_label[:5]))
+    end = datetime.combine(return_on, time.fromisoformat(return_time))
+    if end <= start:
+        raise HTTPException(422, f"Bring {title} back after you collect it")
+    units = max(1, math.ceil((end - start).total_seconds() / 3600))
+    if cap and units > cap:
+        raise HTTPException(422, f"{title} can be borrowed for at most {cap} hours")
+    return units
+
+
 async def build_order_lines(
-    db: Database, store: dict[str, Any], items: list[Any]
+    db: Database, store: dict[str, Any], items: list[Any],
+    *, collect_on: Any = None, return_on: Any = None, return_time: str | None = None, slot_label: str | None = None,
 ) -> tuple[list[dict[str, Any]], bool, int]:
     cfg = store_settings(store)
     merged: OrderedDict[tuple[Any, ...], int] = OrderedDict()
@@ -248,11 +290,14 @@ async def build_order_lines(
         if p["kind"] == "printing":
             needs_quote = True
         price, name, stock = base_price(p, vid)
+        units = borrow_units(p, collect_on, return_on, slot_label, return_time)
         chosen, addons_minor = _priced_addons(p, [AddonPick(id=i, quantity=q) for i, q in signature])
         lines.append({
             "product_id": pid, "variant_id": vid, "title": p["title"], "variant_name": name,
             "unit_price_minor": price, "quantity": qty, "addons": chosen, "addons_minor": addons_minor,
-            "line_total_minor": (price + addons_minor) * qty, "tracked": stock is not None, "print": None,
+            "billed_units": units, "rate_unit": p.get("rate_unit"),
+            "line_total_minor": (price * units + addons_minor) * qty, "tracked": stock is not None, "print": None,
+            "listing_type": p.get("listing_type") or "new",
             "category": p.get("category") or "", "kind": p.get("kind") or "product",
         })
 
@@ -271,9 +316,55 @@ async def build_order_lines(
             "variant_name": name, "unit_price_minor": job["total_minor"], "quantity": 1,
             "addons": [], "addons_minor": 0, "line_total_minor": job["total_minor"],
             "tracked": stock is not None, "print": job,
+            "listing_type": p.get("listing_type") or "new",
             "category": p.get("category") or "", "kind": p.get("kind") or "printing",
         })
     return lines, needs_quote, prep_min
+
+
+def _seller_alert(order: dict[str, Any], buyer_name: str, store_name: str) -> tuple[str, str, str]:
+    """Title, body, and link the seller sees. A print job names the packet and the spec."""
+    jobs = [item["print"] for item in order.get("items") or [] if item.get("print")]
+    if not jobs:
+        borrowed = _borrow_alert(order, buyer_name)
+        if borrowed:
+            return borrowed
+        return "New order", f"{buyer_name} ordered from {store_name}", f"/orders/{order['_id']}"
+    packet = next(
+        (
+            str(answer.get("value") or "").strip()
+            for answer in order.get("answers") or []
+            if answer.get("id") == "packet" or "packet" in str(answer.get("label") or "").lower()
+        ),
+        "",
+    )
+    specs: list[str] = []
+    for job in jobs:
+        colour = "colour" if job.get("color") == "color" else "black and white"
+        urgent = ", urgent" if job.get("urgent") else ""
+        specs.append(
+            f"{int(job.get('copies') or 0)} copies, {int(job.get('pages') or 0)} pages, "
+            f"{colour}, {job.get('paper') or 'paper'}{urgent}"
+        )
+    body = f"Packet: {packet}. " if packet else ""
+    return "Print job", body + " ".join(specs), "/seller?tab=Orders"
+
+
+def _borrow_alert(order: dict[str, Any], buyer_name: str) -> tuple[str, str, str] | None:
+    """A lend line is a person handing over their own thing, not a sale."""
+    titles = [str(item.get("title") or "item") for item in order.get("items") or [] if item.get("listing_type") == "lend"]
+    if not titles:
+        return None
+    due = next(
+        (
+            str(answer.get("value") or "").strip()
+            for answer in order.get("answers") or []
+            if answer.get("id") == "return_by"
+        ),
+        "",
+    )
+    due_bit = f" Back by {due}." if due else ""
+    return "Borrow request", f"{buyer_name} wants {', '.join(titles)}.{due_bit}", "/seller?tab=Orders"
 
 
 async def create_order(db: Database, buyer: dict[str, Any], body: OrderIn) -> dict[str, Any]:
@@ -292,7 +383,17 @@ async def create_order(db: Database, buyer: dict[str, Any], body: OrderIn) -> di
         raise HTTPException(422, "This store does not accept that payment option")
     slot = _check_slot(cfg, body)
     answers = _check_answers(cfg, body.answers)
-    lines, needs_quote, prep_min = await build_order_lines(db, store, body.items)
+    collect_on = body.pickup_slot.date if body.pickup_slot else body.collect_on
+    if body.return_on and not any(a["id"] == "return_by" for a in answers):
+        due = body.return_on.isoformat()
+        if body.return_time:
+            due = f"{due} {body.return_time}"
+        answers.append({"id": "return_by", "label": "Bring it back on", "value": due})
+    lines, needs_quote, prep_min = await build_order_lines(
+        db, store, body.items,
+        collect_on=collect_on, return_on=body.return_on, return_time=body.return_time,
+        slot_label=body.pickup_slot.label if body.pickup_slot else None,
+    )
 
     catalogue = sum(x["line_total_minor"] for x in lines if not x.get("print"))
     printed = sum(x["line_total_minor"] for x in lines if x.get("print"))
@@ -320,7 +421,7 @@ async def create_order(db: Database, buyer: dict[str, Any], body: OrderIn) -> di
         else:
             for r in reserved:
                 await _restore(db, r)
-            raise HTTPException(409, f"Not enough stock for {line['title']}")
+            raise HTTPException(409, f"Not enough left of {line['title']}. Someone else took the last ones.")
 
     status = "quote_requested" if needs_quote else "placed"
     order = {
@@ -378,10 +479,9 @@ async def create_order(db: Database, buyer: dict[str, Any], body: OrderIn) -> di
             )
         raise
     await push_order(order)
+    title, message, href = _seller_alert(order, buyer["name"], store["name"])
     await notifications.notify(
-        db, store["owner_id"], "order", "New order",
-        f"{buyer['name']} ordered from {store['name']}",
-        f"/orders/{order['_id']}", order["_id"],
+        db, store["owner_id"], "order", title, message, href, order["_id"],
     )
     return order
 
@@ -428,6 +528,18 @@ async def change_status(
             await db.products.update_one(
                 {"_id": line["product_id"]}, {"$inc": {"sold_count": line["quantity"]}}
             )
+        # A borrow holds the piece until the owner marks it returned. A sale stays sold.
+        if order.get("stock_reserved") and any(
+            line.get("listing_type") == "lend" and line.get("tracked") for line in order["items"]
+        ):
+            cleared = await db.orders.update_one(
+                {"_id": order["_id"], "stock_reserved": True},
+                {"$set": {"stock_reserved": False}},
+            )
+            if cleared.modified_count == 1:
+                for line in order["items"]:
+                    if line.get("listing_type") == "lend" and line.get("tracked"):
+                        await _restore(db, line)
         await _credit_seller(db, order, charged_now)
     updated = await db.orders.find_one({"_id": order["_id"]})
     assert updated is not None

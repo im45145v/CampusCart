@@ -16,3 +16,10 @@ export function formatTime(iso: string): string {
 export function rupeesToMinor(value: string): number {
   return Math.round(parseFloat(value || '0') * 100)
 }
+
+/** The stall takes campus credits when the price is known, and does not take cash at collection. */
+export function paysUpfront(options?: readonly string[] | null): boolean {
+  return !!options?.includes('campus_wallet')
+    && !options.includes('pay_on_pickup')
+    && !options.includes('manual_confirmation')
+}

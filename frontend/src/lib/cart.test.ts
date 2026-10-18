@@ -1,4 +1,4 @@
-import { addLine, estimateTotal, groupByStore, lineKey, MAX_QTY, setQuantity, type CartLine } from './cart'
+import { addLine, borrowUnits, estimateTotal, groupByStore, lineKey, MAX_QTY, setQuantity, type CartLine } from './cart'
 
 const line = (over: Partial<CartLine> = {}): CartLine => ({
   storeId: 's1', storeName: 'S', productId: 'p1', variantId: null, title: 'Samosa',
@@ -21,6 +21,16 @@ describe('cart', () => {
     const c = addLine([], line())
     expect(setQuantity(c, lineKey(c[0]), 4)[0].quantity).toBe(4)
     expect(setQuantity(c, lineKey(c[0]), 0)).toEqual([])
+  })
+  it('bills whole days and stops at the listing cap', () => {
+    expect(borrowUnits({ unit: 'day', collectOn: '2026-10-19', returnOn: '2026-10-21', maxUnits: 3 })).toEqual({ units: 2, error: '' })
+    expect(borrowUnits({ unit: 'day', collectOn: '2026-10-19', returnOn: '2026-10-19', maxUnits: 3 }).units).toBe(1)
+    expect(borrowUnits({ unit: 'day', collectOn: '2026-10-19', returnOn: '2026-10-23', maxUnits: 2 }).error).toBe('At most 2 days')
+  })
+  it('bills hours from the handover to the return time', () => {
+    const span = borrowUnits({ unit: 'hour', collectOn: '2026-10-19', returnOn: '2026-10-19', slotLabel: '12:00-14:00', returnTime: '18:00', maxUnits: 8 })
+    expect(span).toEqual({ units: 6, error: '' })
+    expect(borrowUnits({ unit: 'hour', collectOn: '2026-10-19', returnOn: '2026-10-19', slotLabel: '12:00-14:00', returnTime: '20:00', maxUnits: 6 }).error).toBe('At most 6 hours')
   })
   it('estimates totals and groups per store', () => {
     const c = [line({ quantity: 2 }), line({ productId: 'p2', storeId: 's2', unitPriceMinor: 500 })]

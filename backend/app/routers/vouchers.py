@@ -64,7 +64,12 @@ async def preview(body: VoucherPreviewIn, user: CurrentUser, db: DbDep) -> dict[
         raise HTTPException(404, "Store not found")
     if store["owner_id"] == user["_id"]:
         raise HTTPException(400, "You cannot order from your own store")
-    lines, needs_quote, _prep = await order_svc.build_order_lines(db, store, body.items)
+    collect_on = body.pickup_slot.date if body.pickup_slot else body.collect_on
+    lines, needs_quote, _prep = await order_svc.build_order_lines(
+        db, store, body.items,
+        collect_on=collect_on, return_on=body.return_on, return_time=body.return_time,
+        slot_label=body.pickup_slot.label if body.pickup_slot else None,
+    )
     catalogue = sum(line["line_total_minor"] for line in lines if not line.get("print"))
     estimated = sum(line["line_total_minor"] for line in lines)
     membership = 0

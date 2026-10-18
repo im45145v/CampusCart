@@ -1,5 +1,5 @@
 import { useState, type FormEvent } from 'react'
-import { Link, useLocation, useNavigate } from 'react-router-dom'
+import { useLocation, useNavigate } from 'react-router-dom'
 import { Empty, Notice } from '@/components/States'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
@@ -41,7 +41,7 @@ export function PlanCards({ plans, mine, onChanged }: { plans: Plan[]; mine: Sub
                 <p className="font-semibold text-terracotta">{formatMoney(p.price_minor)} / {p.period} · {p.discount_percent}% off</p>
                 {sub ? (
                   <div className="mt-auto space-y-2">
-                    <p className="text-sm text-forest">Yours until {formatTime(sub.period_end)}. Catalogue orders at this store take the discount automatically. Quotes stay at the seller's price.</p>
+                    <p className="text-sm text-forest">Yours until {formatTime(sub.period_end)}. The discount applies at this stall.</p>
                     <div className="flex flex-wrap gap-2">
                       <Button size="sm" variant="secondary" onClick={() => act(`/api/subscriptions/${sub.id}/renew`)}>Renew from wallet</Button>
                       <Button size="sm" variant="ghost" onClick={() => act(`/api/subscriptions/${sub.id}/cancel`)}>Cancel</Button>
@@ -87,7 +87,7 @@ export function PlanEditor({ storeId, plans, onSaved }: { storeId: string; plans
   }
   return (
     <div className="space-y-4">
-      <p className="text-sm text-taupe">A plan is a meal club, print bundle, or lending desk membership. It discounts catalogue orders while it is active. There is no card charge and no silent renewal. Up to six plans per store.</p>
+      <p className="text-sm text-taupe">A discount at this stall, paid from the campus wallet. It does not renew on its own. Up to six plans.</p>
       <ul className="space-y-2">
         {plans.map((p) => (
           <li key={p.id}>
@@ -115,7 +115,6 @@ export function PlanEditor({ storeId, plans, onSaved }: { storeId: string; plans
           {msg && <Notice tone={msg.tone}>{msg.text}</Notice>}
         </form>
       </Card>
-      <p className="text-sm text-taupe">Members manage renewal from the store page or their <Link className="text-terracotta underline" to="/account">account</Link>.</p>
     </div>
   )
 }
