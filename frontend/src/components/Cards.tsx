@@ -42,8 +42,8 @@ export function ProductCard({ product }: { product: Product }) {
         </div>
         <h3 className="font-bold">{product.title}</h3>
         <p className="text-terracotta font-semibold">
-          {product.variants.length > 0 && 'from '}{formatMoney(product.price_from_minor)}
-          {product.kind === 'printing' && ' (quote)'}
+          {(product.variants.length > 0 || product.print_spec) && 'from '}{formatMoney(product.price_from_minor)}
+          {product.print_spec ? ' / page' : product.kind === 'printing' ? ' (quote)' : ''}
         </p>
         <div className="mt-1 flex gap-2">
           {product.in_stock ? <Badge tone="ok">Available</Badge> : <Badge tone="bad">Unavailable</Badge>}

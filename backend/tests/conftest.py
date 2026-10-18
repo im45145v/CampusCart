@@ -62,13 +62,17 @@ async def other(client: httpx.AsyncClient) -> Actor:
 
 
 @pytest.fixture
-async def store(client: httpx.AsyncClient, seller: Actor) -> dict[str, Any]:
+async def store(client: httpx.AsyncClient, seller: Actor, database: Any) -> dict[str, Any]:
     r = await client.post(
         "/api/stores", headers=seller.headers,
         json={"name": "Sally's Snacks", "category": "food", "description": "Tasty"},
     )
     assert r.status_code == 201, r.text
-    return dict(r.json())
+    body = dict(r.json())
+    # Applications start pending. Existing tests use an already approved store.
+    await database.stores.update_one({"_id": body["id"]}, {"$set": {"status": "active"}})
+    body["status"] = "active"
+    return body
 
 
 async def make_product(

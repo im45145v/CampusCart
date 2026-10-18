@@ -76,7 +76,7 @@ function Thread({ conv }: { conv: Conversation }) {
       setPending((p) => p.filter((m) => m.client_id !== e.client_id))
       setError(e.code === 'rate_limited' ? 'You are sending messages too quickly.' : 'Message could not be sent.')
     }
-  }), [chat, conv.id, merge])
+  }), [chat.subscribe, conv.id, merge])
 
   useEffect(() => {
     bottom.current?.scrollIntoView?.({ block: 'end' })
@@ -119,7 +119,13 @@ function Thread({ conv }: { conv: Conversation }) {
   return (
     <div className="flex h-[70vh] flex-col rounded-2xl border border-line bg-card">
       <div className="flex items-center justify-between border-b border-line p-3">
-        <div><p className="font-bold">{conv.other_user.name}</p><p className="text-xs text-taupe">{conv.store_name}{conv.order_id ? ' · about an order' : ''}</p></div>
+        <div>
+          <p className="font-bold">{conv.other_user.name}</p>
+          <p className="text-xs text-taupe">
+            <span className={conv.other_user.online ? 'text-ok' : undefined}>{conv.other_user.online ? 'Online' : 'Offline'}</span>
+            {' · '}{conv.store_name}{conv.order_id ? ' · about an order' : ''}
+          </p>
+        </div>
         <ReportButton targetType="conversation" targetId={conv.id} />
       </div>
       <div className="flex-1 space-y-2 overflow-y-auto p-3" role="log" aria-live="polite" aria-label="Messages">
@@ -148,26 +154,64 @@ function Thread({ conv }: { conv: Conversation }) {
   )
 }
 
+function applyLiveMessage(list: Conversation[], msg: Message, meId: string | undefined, openId: string | null): Conversation[] | null {
+  const index = list.findIndex((c) => c.id === msg.conversation_id)
+  if (index < 0) return null
+  const current = list[index]
+  const mine = msg.sender_id === meId
+  const open = current.id === openId
+  const next: Conversation = {
+    ...current,
+    last_seq: Math.max(current.last_seq, msg.seq),
+    updated_at: msg.created_at,
+    last_message: { text: msg.text, sender_id: msg.sender_id, at: msg.created_at, seq: msg.seq },
+    unread: mine ? current.unread : open ? 0 : current.unread + 1,
+  }
+  return [next, ...list.filter((_, i) => i !== index)]
+}
+
 export default function Inbox() {
   const chat = useChat()
+  const { user } = useAuth()
   const [sp, setSp] = useSearchParams()
-  const { data, loading, error, reload } = useFetch<Conversation[]>('/api/chat/conversations')
-  const active = data?.find((c) => c.id === sp.get('c'))
-  useEffect(() => chat.subscribe((e) => { if (e.type === 'message') void reload() }), [chat, reload])
-  useEffect(() => { void reload() }, [chat.reconnects, chat.unread, reload])
+  const { data, loading, error, reload, reloadQuiet, setData } = useFetch<Conversation[]>('/api/chat/conversations')
+  const openId = sp.get('c')
+  const active = data?.find((c) => c.id === openId)
+  useEffect(() => chat.subscribe((e) => {
+    if (e.type === 'message' || e.type === 'ack') {
+      setData((cur) => {
+        if (!cur) return cur
+        const next = applyLiveMessage(cur, e.message, user?.id, openId)
+        if (!next) void reloadQuiet()
+        return next ?? cur
+      })
+    } else if (e.type === 'presence') {
+      setData((cur) => cur?.map((c) => c.other_user.id === e.user_id ? { ...c, other_user: { ...c.other_user, online: e.online } } : c) ?? cur)
+    }
+  }), [chat.subscribe, openId, reloadQuiet, setData, user?.id])
+  useEffect(() => {
+    if (chat.reconnects === 0) return
+    void reloadQuiet()
+  }, [chat.reconnects, reloadQuiet])
+  useEffect(() => {
+    if (!openId) return
+    setData((cur) => cur?.map((c) => c.id === openId && c.unread > 0 ? { ...c, unread: 0 } : c) ?? cur)
+  }, [openId, setData])
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-extrabold">Messages</h1>
-        {chat.status === 'offline' && <p role="status" className="flex items-center gap-1 text-sm text-warn"><WifiOff className="h-4 w-4" aria-hidden /> Reconnecting… messages still send.</p>}
+        {chat.status === 'online'
+          ? <p role="status" className="text-sm text-ok">Live</p>
+          : <p role="status" className="flex items-center gap-1 text-sm text-warn"><WifiOff className="h-4 w-4" aria-hidden /> {chat.status === 'connecting' ? 'Connecting…' : 'Reconnecting… messages still send.'}</p>}
       </div>
-      {loading ? <Loading /> : error ? <ErrorState message={error} onRetry={reload} /> : !data?.length ? <Empty title="No conversations yet">Message a seller from a store, product or order page.</Empty> : (
+      {loading && !data ? <Loading /> : error && !data ? <ErrorState message={error} onRetry={reload} /> : !data?.length ? <Empty title="No conversations yet">Message a seller from a store, product or order page.</Empty> : (
         <div className="grid gap-4 md:grid-cols-[320px_1fr]">
           <ul className="space-y-2" aria-label="Conversations">
             {data.map((c) => (
               <li key={c.id}>
                 <button onClick={() => setSp({ c: c.id })} aria-current={c.id === active?.id} className={cn('w-full rounded-xl border border-line bg-card p-3 text-left hover:bg-ivory', c.id === active?.id && 'border-terracotta')}>
-                  <div className="flex items-center justify-between"><span className="font-semibold">{c.other_user.name}</span>{c.unread > 0 && <span className="rounded-full bg-terracotta px-2 text-xs text-white" aria-label={`${c.unread} unread`}>{c.unread}</span>}</div>
+                  <div className="flex items-center justify-between"><span className="flex items-center gap-2 font-semibold">{c.other_user.online && <span className="h-2 w-2 rounded-full bg-ok" aria-label="Online" />}{c.other_user.name}</span>{c.unread > 0 && <span className="rounded-full bg-terracotta px-2 text-xs text-white" aria-label={`${c.unread} unread`}>{c.unread}</span>}</div>
                   <p className="text-xs text-taupe">{c.store_name}</p>
                   <p className="truncate text-sm text-taupe">{c.last_message?.text ?? 'No messages yet'}</p>
                 </button>

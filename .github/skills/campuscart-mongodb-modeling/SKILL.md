@@ -13,7 +13,7 @@ When to use
 - Trigger when changing `backend/app/db.py`, model-like Pydantic structures, or collection access patterns.
 
 Procedure
-1. Work from the known collections: `users`, `stores`, `products`, `orders`, `conversations`, `messages`, `reviews`, `reports`, `audit_logs`, `ws_tickets`, `api_tokens`.
+1. Work from the known collections: `users`, `stores`, `products`, `orders`, `conversations`, `messages`, `reviews`, `reports`, `audit_logs`, `wallet_ledger`, `plans`, `subscriptions`, `notifications`, `vouchers`, `voucher_redemptions`, `ws_tickets`, `api_tokens`.
 2. Preserve string UUID `_id` values and integer minor-unit money fields such as `price_minor` and `total_minor`.
 3. Keep totals computed server-side and stock changes atomic with conditional `$gte` updates plus one-time restore on cancel or reject.
 4. Add or refine indexes in `backend/app/db.py` where query paths justify them.

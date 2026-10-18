@@ -8,14 +8,18 @@ routers in `backend/app/routers/` are the source of truth.
 |---|---|
 | Auth | `POST /auth/register`, `POST /auth/login`, `GET /auth/me` (rate limited) |
 | Home | `GET /home`, `GET /health` |
-| Stores | `GET /stores`, `POST /stores`, `GET /stores/mine`, `GET/PATCH /stores/{id}`, `GET /stores/{id}/order-options`, `GET /stores/{id}/reviews` |
+| Stores | `GET /stores`, `POST /stores` (starts `pending`), `POST /stores/{id}/resubmit`, `GET /stores/mine`, `GET/PATCH /stores/{id}`, `GET /stores/{id}/order-options`, `GET /stores/{id}/reviews` |
 | Products | `GET /products` (q, category, store, price, availability), `POST /stores/{id}/products` (draft), `GET/PATCH /products/{id}`, `POST /products/{id}/publish`, `/unpublish` |
-| Orders | `POST /orders`, `GET /orders`, `GET /seller/orders`, `GET /orders/{id}`, `POST /orders/{id}/status`, `/quote`, `/confirm-payment`, `/review` |
-| Account | saved stores under `/me/saved-stores`, `GET /seller/summary`, API tokens under `/seller/api-tokens` |
+| Orders | `POST /orders`, `GET /orders`, `GET /seller/orders`, `GET /orders/{id}`, `POST /orders/{id}/status`, `/quote`, `/confirm-payment`, `/review`, `GET /orders/{id}/review`, `POST /products/{id}/print-preview` |
+| Notifications | `GET /me/notifications`, `POST /me/notifications/read` |
+| Wallet | `GET /me/wallet`, `POST /me/wallet/add`, `POST /me/wallet/remove`. Admin: `GET /admin/wallet`, `POST /admin/wallet/{id}/paid`, `/return`, `/reverse` |
+| Plans | `GET/POST /stores/{id}/plans`, `PATCH /plans/{id}`, `POST /plans/{id}/subscribe`, `GET /me/subscriptions`, `POST /subscriptions/{id}/renew`, `/cancel`, `GET /stores/{id}/subscribers` |
+| Vouchers | `GET /stores/{id}/vouchers`, `POST /stores/{id}/vouchers`, `PATCH /vouchers/{id}` (`active`), `POST /vouchers/preview`, admin `GET/POST /admin/vouchers` |
+| Account | saved stores under `/me/saved-stores`, `GET /seller/summary`, `GET /seller/charts`, API tokens under `/seller/api-tokens` |
 | Reports | `POST /reports` |
-| Admin | users, stores, products moderation, reports (`/admin/reports`, `/resolve`, reported conversation), `GET /admin/audit` |
-| AI | `POST /ai/listing-draft` (503 means use the manual form), `POST /ai/transcribe` |
-| Uploads | `POST /uploads` (seller; PNG/JPEG/WebP, size limited, content sniffed) |
+| Admin | users, stores, products moderation, reports (`/admin/reports`, `/resolve`, reported conversation), `GET /admin/audit`, `POST /admin/stores/{id}/decision` (`approved` or `rejected` while `pending`) |
+| AI | `POST /ai/listing-draft` and `POST /ai/transcribe` use hosted Gemma 4 when `GEMMA_API_KEY` is set (503 means type the listing) |
+| Uploads | `POST /uploads` (seller; PNG/JPEG/WebP), `POST /uploads/documents` (any logged-in user; PDF or image, page count returned) |
 | Edge | `GET /edge/pending-orders`, `/edge/orders/{id}/summary`, `/edge/low-stock`, `/edge/today-sales`, `/edge/products/availability` (API token only) |
 
 Order creation: `{store_id, items:[{product_id, variant_id?, quantity}], fulfillment, payment_method, note, ...}`.
@@ -33,6 +37,22 @@ checkbox; `required` honoured), and optional pickup time slots (`slots` as `HH:M
 `answers: {field_id: value}`, and store `pickup_slot`, `answers` and `est_wait_min`
 (`lead_time_min` + `queue_min_per_order` per open order + the slowest item's `prep_time_min`).
 `GET /stores/{id}/order-options` returns the settings plus live slot availability for the checkout UI.
+`payment_options` may include `campus_wallet`. That method debits the buyer's campus-wallet balance when the
+catalogue total is known, or when the buyer accepts a quote. Cancel and reject credit it back once. Completing the
+order credits the seller the same amount. `POST /orders/{id}/confirm-payment` rejects a wallet-paid order.
+`POST /me/wallet/add` records a campus-ledger top-up (₹10–₹2,000, ₹5,000 per UTC day) and does not verify UPI.
+`POST /me/wallet/remove` debits a payout request that staff later mark paid or return.
+
+An active store plan discounts catalogue orders by `discount_percent` (server-side, before the wallet debit).
+A voucher code on `POST /orders` (`voucher_code`) is checked the same way. `POST /vouchers/preview` shows the discount before the order is placed. Percent or a fixed amount, after the membership share, and only on lines the code covers. Conditions can require a first campus order, a first order at that store, a new account, a minimum covered subtotal, a minimum item count, a category, a product kind, or a payment option. Each student can use a code once. Cancel or reject releases that use. Quote-only orders cannot take a code. The store receives the discounted total; nothing here reimburses the difference.
+Food extras (`addons` on a product, picks on an order line) are priced per item in minor units and included in that discount.
+A printing listing with `print_spec` is priced from the uploaded file: impressions = pages × copies, sheets = ceil(pages / sides) × copies, then paper, binding, and an integer urgent percent. Membership discount does not apply to that print total. Printing without a rate card stays a seller quote.
+`GET /me/notifications` is the bell. New orders, status changes, quotes, messages, store decisions, and desk wallet actions insert a row and push `{type: "notification"}` on the chat socket. The socket list is still in-memory.
+Printing quotes are not discounted. Subscribing, renewing, and the first period are wallet debits. Cancelling does
+not refund the current period. One active subscription per buyer per store.
+
+`POST /reviews/{id}/reply` lets the store owner reply once. Reviews may include `aspects` of quality, timing, and value.
+Order changes are also pushed on `/ws/chat` as `{type: "order", order}`.
 
 Limits: slot capacity is re-checked after insert, so a simultaneous last-place booking fails safe with 409. Slots
 are per store, not per item, and the wait time is an estimate, not a promise.
@@ -48,6 +68,8 @@ ticket is rejected; a disallowed `Origin` is rejected.
 Client frames: `send {conversation_id, text, client_id}`, `read {conversation_id, up_to_seq}`,
 `typing {conversation_id}`, `ping`.
 Server frames: `ready`, `ack` (only after the message is stored; retrying the same `client_id` is idempotent),
-`message`, `typing`, `read`, `pong`, `error {code}`.
+`message`, `typing`, `read`, `presence {user_id, online}`, `pong`, `error {code}`.
+`presence` is pushed when a conversation partner connects or their last socket closes, and the connecting user is told who is already online.
+The connection list is in-memory, so presence and live delivery stay on one API process.
 Sender identity comes from the ticket's user. Non-members get `not_found`. Limits: message length, frame size and
 10 messages per 10 s per user.

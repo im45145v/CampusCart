@@ -1,8 +1,9 @@
 from typing import Any
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Query
 
 from ..deps import CurrentUser, DbDep, SellerUser
+from ..schemas import NotificationReadIn
 from ..security import generate_api_token, hash_api_token
 from ..services import stats
 from ..util import new_id, now, out
@@ -41,6 +42,11 @@ async def seller_summary(user: SellerUser, db: DbDep) -> dict[str, Any]:
     }
 
 
+@router.get("/seller/charts")
+async def seller_charts(user: SellerUser, db: DbDep) -> dict[str, Any]:
+    return await stats.seller_charts(db, user["_id"])
+
+
 @router.post("/seller/api-tokens", status_code=201)
 async def create_api_token(user: SellerUser, db: DbDep) -> dict[str, Any]:
     """Create a read-only token for the UNO Q assistant. The raw token is shown once."""
@@ -57,6 +63,25 @@ async def create_api_token(user: SellerUser, db: DbDep) -> dict[str, Any]:
 async def list_api_tokens(user: SellerUser, db: DbDep) -> list[dict[str, Any]]:
     cur = db.api_tokens.find({"user_id": user["_id"], "revoked": False}, {"token_hash": 0})
     return [out(t) async for t in cur]
+
+
+@router.get("/me/notifications")
+async def list_notifications(
+    user: CurrentUser, db: DbDep, limit: int = Query(30, ge=1, le=50)
+) -> dict[str, Any]:
+    cur = db.notifications.find({"user_id": user["_id"]}).sort("created_at", -1).limit(limit)
+    items = [out(n) async for n in cur]
+    unread = await db.notifications.count_documents({"user_id": user["_id"], "read": False})
+    return {"unread": unread, "items": items}
+
+
+@router.post("/me/notifications/read")
+async def read_notifications(body: NotificationReadIn, user: CurrentUser, db: DbDep) -> dict[str, int]:
+    flt: dict[str, Any] = {"user_id": user["_id"], "read": False}
+    if not body.mark_all:
+        flt["_id"] = {"$in": body.ids}
+    res = await db.notifications.update_many(flt, {"$set": {"read": True}})
+    return {"updated": res.modified_count}
 
 
 @router.delete("/seller/api-tokens/{token_id}", status_code=204)

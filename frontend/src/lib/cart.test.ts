@@ -27,4 +27,10 @@ describe('cart', () => {
     expect(estimateTotal(c)).toBe(3500)
     expect([...groupByStore(c).keys()]).toEqual(['s1', 's2'])
   })
+  it('keeps different extras apart and adds their price', () => {
+    const egg = { id: 'egg', name: 'Fried egg', priceMinor: 2000, quantity: 1 }
+    const c = addLine(addLine([], line({ addons: [egg] })), line())
+    expect(c).toHaveLength(2)
+    expect(estimateTotal([line({ quantity: 2, addons: [egg] })])).toBe(7000)
+  })
 })

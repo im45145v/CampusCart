@@ -4,7 +4,7 @@ from fastapi import APIRouter, HTTPException
 from pymongo.errors import DuplicateKeyError
 
 from ..deps import CurrentUser, DbDep
-from ..schemas import ReviewIn
+from ..schemas import ReviewIn, ReviewReplyIn
 from ..util import new_id, now, out
 
 router = APIRouter(prefix="/api", tags=["reviews"])
@@ -22,7 +22,9 @@ async def create_review(
     review = {
         "_id": new_id(), "order_id": order_id, "store_id": order["store_id"],
         "buyer_id": user["_id"], "buyer_name": user["name"], "rating": body.rating,
-        "comment": body.comment, "created_at": now(),
+        "comment": body.comment,
+        "aspects": body.aspects.model_dump() if body.aspects else None,
+        "created_at": now(),
     }
     try:
         await db.reviews.insert_one(review)  # unique index on order_id blocks duplicates
@@ -35,9 +37,38 @@ async def create_review(
     if agg:
         await db.stores.update_one(
             {"_id": order["store_id"]},
-            {"$set": {"rating_avg": round(agg[0]["avg"], 2), "rating_count": agg[0]["n"]}},
+            {"$set": {"rating_avg": round(agg[0]["avg"], 2), "rating_count": agg[0]["n"]},
+             "$inc": {f"rating_hist.{body.rating}": 1}},
         )
     return out(review)
+
+
+@router.get("/orders/{order_id}/review")
+async def order_review(order_id: str, user: CurrentUser, db: DbDep) -> dict[str, Any]:
+    order = await db.orders.find_one({"_id": order_id})
+    if not order or user["_id"] not in (order["buyer_id"], order["seller_id"]):
+        raise HTTPException(404, "Order not found")
+    review = await db.reviews.find_one({"order_id": order_id})
+    return {"review": out(review) if review else None}
+
+
+@router.post("/reviews/{review_id}/reply")
+async def reply_review(
+    review_id: str, body: ReviewReplyIn, user: CurrentUser, db: DbDep
+) -> dict[str, Any]:
+    review = await db.reviews.find_one({"_id": review_id})
+    if not review:
+        raise HTTPException(404, "Review not found")
+    store = await db.stores.find_one({"_id": review["store_id"], "owner_id": user["_id"]})
+    if not store:
+        raise HTTPException(404, "Review not found")
+    res = await db.reviews.update_one(
+        {"_id": review_id, "seller_reply": {"$exists": False}},
+        {"$set": {"seller_reply": body.reply, "seller_reply_at": now()}},
+    )
+    if res.modified_count != 1:
+        raise HTTPException(409, "This review already has a reply")
+    return out(await db.reviews.find_one({"_id": review_id}))
 
 
 @router.get("/stores/{store_id}/reviews")

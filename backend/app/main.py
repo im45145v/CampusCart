@@ -17,11 +17,14 @@ from .routers import (
     home,
     me,
     orders,
+    plans,
     products,
     reports,
     reviews,
     stores,
     uploads,
+    vouchers,
+    wallet,
     ws,
 )
 
@@ -42,7 +45,7 @@ def create_app() -> FastAPI:
         allow_methods=["*"], allow_headers=["*"],
     )
     for r in (home, auth, stores, products, orders, me, chat, ws, reviews, reports, admin, ai,
-              uploads, edge):
+              uploads, edge, wallet, plans, vouchers):
         app.include_router(r.router)
     Path(s.upload_dir).mkdir(parents=True, exist_ok=True)
     app.mount("/uploads", StaticFiles(directory=s.upload_dir), name="uploads")

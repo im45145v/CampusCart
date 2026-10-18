@@ -3,7 +3,8 @@ from typing import Any
 from fastapi import APIRouter, HTTPException, Query
 
 from ..deps import CurrentUser, DbDep, OptionalUser
-from ..schemas import ListingType, ProductIn, ProductPatch
+from ..schemas import ListingType, PrintJobIn, ProductIn, ProductPatch
+from ..services import printing
 from ..util import contains_regex, new_id, now, out
 from .stores import can_manage, get_store_or_404
 
@@ -20,16 +21,44 @@ def product_view(p: dict[str, Any]) -> dict[str, Any]:
         d["price_from_minor"] = min(v["price_minor"] for v in variants)
     else:
         d["price_from_minor"] = d["price_minor"]
+    d["addons"] = d.get("addons") or []
+    spec = d.get("print_spec")
+    if spec:
+        d["price_from_minor"] = min(spec["bw_per_page_minor"], spec["color_per_page_minor"])
     return d
 
 
-def _prepare_variants(variants: list[Any]) -> list[dict[str, Any]]:
+def _with_ids(items: list[Any]) -> list[dict[str, Any]]:
     result = []
-    for v in variants:
-        item = v.model_dump() if hasattr(v, "model_dump") else dict(v)
+    seen: set[str] = set()
+    for raw in items:
+        item = raw.model_dump() if hasattr(raw, "model_dump") else dict(raw)
         item["id"] = item.get("id") or new_id()
+        if item["id"] in seen:
+            raise HTTPException(422, "Duplicate option id")
+        seen.add(item["id"])
         result.append(item)
     return result
+
+
+def _prepare_variants(variants: list[Any]) -> list[dict[str, Any]]:
+    return _with_ids(variants)
+
+
+def _prepare_spec(spec: Any) -> dict[str, Any] | None:
+    if spec is None:
+        return None
+    data = spec.model_dump() if hasattr(spec, "model_dump") else dict(spec)
+    data["papers"] = _with_ids(data["papers"])
+    data["bindings"] = _with_ids(data["bindings"])
+    return data
+
+
+def _check_listing(kind: str, addons: list[Any], spec: Any) -> None:
+    if kind == "printing" and addons:
+        raise HTTPException(422, "Print listings use a rate card, not food extras")
+    if spec is not None and kind != "printing":
+        raise HTTPException(422, "Only printing listings have a rate card")
 
 
 async def _owned_product(db: Any, product_id: str, user: dict[str, Any]) -> dict[str, Any]:
@@ -48,8 +77,11 @@ async def create_product(
     store = await get_store_or_404(db, store_id)
     if store["owner_id"] != user["_id"]:
         raise HTTPException(403, "Not your store")
+    _check_listing(body.kind, body.addons, body.print_spec)
     data = body.model_dump()
     data["variants"] = _prepare_variants(body.variants)
+    data["addons"] = _with_ids(body.addons)
+    data["print_spec"] = _prepare_spec(body.print_spec)
     if body.kind == "printing":
         data["stock"] = None
     p = {
@@ -133,14 +165,36 @@ async def get_product(product_id: str, db: DbDep, user: OptionalUser = None) -> 
     return product_view(p)
 
 
+@router.post("/products/{product_id}/print-preview")
+async def print_preview(product_id: str, body: PrintJobIn, user: CurrentUser, db: DbDep) -> dict[str, Any]:
+    """Price a file with this listing's rate card. The same function prices the order."""
+    del user
+    p = await db.products.find_one({"_id": product_id, "published": True, "moderation_status": "active"})
+    if not p or not p.get("print_spec"):
+        raise HTTPException(404, "Print listing not found")
+    store = await get_store_or_404(db, p["store_id"])
+    if store["status"] != "active":
+        raise HTTPException(404, "Print listing not found")
+    inspected = printing.inspect_upload(body.file_url)
+    return printing.price_job(p["print_spec"], body.model_dump(), inspected["pages"])
+
+
 @router.patch("/products/{product_id}")
 async def update_product(
     product_id: str, body: ProductPatch, user: CurrentUser, db: DbDep
 ) -> dict[str, Any]:
-    await _owned_product(db, product_id, user)
     changes = body.model_dump(exclude_unset=True)
+    current = await _owned_product(db, product_id, user)
     if "variants" in changes and body.variants is not None:
         changes["variants"] = _prepare_variants(body.variants)
+    if "addons" in changes and body.addons is not None:
+        changes["addons"] = _with_ids(body.addons)
+    if "print_spec" in changes:
+        changes["print_spec"] = _prepare_spec(body.print_spec)
+    kind = changes.get("kind") or current["kind"]
+    addons = changes["addons"] if "addons" in changes else current.get("addons") or []
+    spec = changes["print_spec"] if "print_spec" in changes else current.get("print_spec")
+    _check_listing(kind, addons, spec)
     for required in ("title", "price_minor", "kind", "listing_type", "category", "available",
                      "description", "variants", "image_urls", "prep_time_min"):
         if required in changes and changes[required] is None:

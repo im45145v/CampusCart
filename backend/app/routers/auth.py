@@ -17,6 +17,7 @@ def public_user(u: dict[str, Any]) -> dict[str, Any]:
     return {
         "id": u["_id"], "name": u["name"], "email": u["email"],
         "roles": u["roles"], "karma_balance": u.get("karma_balance", 0),
+        "wallet_balance_minor": u.get("wallet_balance_minor", 0),
     }
 
 
@@ -28,7 +29,8 @@ async def register(body: RegisterIn, request: Request, db: DbDep) -> dict[str, A
         "_id": new_id(), "name": body.name, "email": body.email,
         "password_hash": hash_password(body.password),
         "roles": ["buyer"],  # admin is never self-assignable; seller is granted on store creation
-        "is_active": True, "saved_stores": [], "karma_balance": 0, "created_at": now(),
+        "is_active": True, "saved_stores": [], "karma_balance": 0,
+        "wallet_balance_minor": 0, "created_at": now(),
     }
     try:
         await db.users.insert_one(user)

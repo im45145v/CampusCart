@@ -32,7 +32,8 @@ async def create_store(body: StoreIn, user: CurrentUser, db: DbDep) -> dict[str,
         raise HTTPException(400, "Store limit reached")
     store = {
         "_id": new_id(), "owner_id": user["_id"], **body.model_dump(),
-        "status": "active", "rating_avg": 0.0, "rating_count": 0, "created_at": now(),
+        "status": "pending", "rating_avg": 0.0, "rating_count": 0,
+        "rating_hist": {"1": 0, "2": 0, "3": 0, "4": 0, "5": 0}, "created_at": now(),
     }
     await db.stores.insert_one(store)
     await db.users.update_one({"_id": user["_id"]}, {"$addToSet": {"roles": "seller"}})
@@ -103,4 +104,19 @@ async def update_store(
                     raise HTTPException(422, e.errors()[0]["msg"]) from None
     if changes:
         await db.stores.update_one({"_id": store_id}, {"$set": changes})
+    return out(await get_store_or_404(db, store_id))
+
+
+@router.post("/stores/{store_id}/resubmit")
+async def resubmit_store(store_id: str, user: CurrentUser, db: DbDep) -> dict[str, Any]:
+    """Send a rejected application back to the admin queue."""
+    s = await get_store_or_404(db, store_id)
+    if s["owner_id"] != user["_id"]:
+        raise HTTPException(403, "Not your store")
+    if s["status"] != "rejected":
+        raise HTTPException(409, "Only a rejected store can be submitted again")
+    await db.stores.update_one(
+        {"_id": store_id, "status": "rejected"},
+        {"$set": {"status": "pending", "review_reason": None}},
+    )
     return out(await get_store_or_404(db, store_id))

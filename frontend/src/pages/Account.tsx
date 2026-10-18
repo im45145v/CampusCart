@@ -1,15 +1,58 @@
+import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import { StoreCard } from '@/components/Cards'
-import { Empty } from '@/components/States'
+import { Empty, Notice } from '@/components/States'
+import { WalletPanel } from '@/components/WalletPanel'
 import { Button } from '@/components/ui/button'
+import { Card } from '@/components/ui/card'
+import { api } from '@/lib/api'
 import { useAuth } from '@/lib/auth'
+import { formatMoney, formatTime } from '@/lib/utils'
 import { useFetch } from '@/lib/useFetch'
-import type { Store } from '@/lib/types'
+import type { Store, Subscription } from '@/lib/types'
 import { OrderList } from './Orders'
+
+function AccountPlans({ subs, onChanged }: { subs: Subscription[]; onChanged: () => void }) {
+  const [error, setError] = useState('')
+  const act = async (path: string) => {
+    setError('')
+    try {
+      await api(path, { method: 'POST' })
+      onChanged()
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Could not update the plan')
+    }
+  }
+  if (!subs.length) return <Empty title="No memberships yet" />
+  return (
+    <div className="space-y-3">
+      <ul className="space-y-2">
+        {subs.map((s) => (
+          <li key={s.id}>
+            <Card className="flex flex-wrap items-center justify-between gap-3">
+              <div>
+                <p className="font-semibold"><Link className="underline" to={`/stores/${s.store_id}`}>{s.title}</Link></p>
+                <p className="text-sm text-taupe">{s.store_name} · {formatMoney(s.price_minor)} / {s.period} · {s.discount_percent}% off · {s.status}{s.status === 'active' ? ` until ${formatTime(s.period_end)}` : ''}</p>
+              </div>
+              {s.status === 'active' && (
+                <div className="flex gap-2">
+                  <Button size="sm" variant="secondary" onClick={() => act(`/api/subscriptions/${s.id}/renew`)}>Renew</Button>
+                  <Button size="sm" variant="ghost" onClick={() => act(`/api/subscriptions/${s.id}/cancel`)}>Cancel</Button>
+                </div>
+              )}
+            </Card>
+          </li>
+        ))}
+      </ul>
+      {error && <Notice tone="bad">{error}</Notice>}
+    </div>
+  )
+}
 
 export default function Account() {
   const { user } = useAuth()
   const saved = useFetch<Store[]>('/api/me/saved-stores')
+  const subs = useFetch<Subscription[]>('/api/me/subscriptions')
   return (
     <div className="space-y-8">
       <div>
@@ -17,6 +60,11 @@ export default function Account() {
         <p className="text-taupe">{user?.email} · roles: {user?.roles.join(', ')}</p>
         <div className="mt-3 flex gap-2"><Button asChild variant="secondary"><Link to="/inbox">Messages</Link></Button>{!user?.roles.includes('seller') && <Button asChild><Link to="/seller">Start selling</Link></Button>}</div>
       </div>
+      <section aria-labelledby="wallet"><h2 id="wallet" className="mb-3 text-xl font-bold">Funds</h2><WalletPanel /></section>
+      <section aria-labelledby="plans">
+        <h2 id="plans" className="mb-3 text-xl font-bold">Your plans</h2>
+        <AccountPlans subs={subs.data ?? []} onChanged={() => void subs.reload()} />
+      </section>
       <section aria-labelledby="oh"><h2 id="oh" className="mb-3 text-xl font-bold">Order history</h2><OrderList /></section>
       <section aria-labelledby="ss">
         <h2 id="ss" className="mb-3 text-xl font-bold">Saved stores</h2>

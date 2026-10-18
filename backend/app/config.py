@@ -22,9 +22,9 @@ class Settings(BaseSettings):
     auth_rate_limit_attempts: int = 10
     auth_rate_limit_window_s: int = 60
 
-    # Optional integrations: everything below may stay empty.
+    # Optional. A key alone uses hosted Gemma 4. GEMMA_BASE_URL overrides that with a local server.
     gemma_base_url: str = ""  # OpenAI-compatible server (Ollama: http://localhost:11434/v1)
-    gemma_model: str = "gemma3:4b"
+    gemma_model: str = "gemma-4-26b-a4b-it"
     gemma_api_key: str = ""
     elevenlabs_api_key: str = ""
     elevenlabs_stt_model: str = "scribe_v1"

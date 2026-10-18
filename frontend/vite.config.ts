@@ -6,6 +6,12 @@ import { defineConfig } from 'vitest/config'
 export default defineConfig({
   plugins: [react(), tailwindcss()],
   resolve: { alias: { '@': fileURLToPath(new URL('./src', import.meta.url)) } },
-  server: { proxy: { '/api': 'http://localhost:8000', '/uploads': 'http://localhost:8000' } },
+  server: {
+    proxy: {
+      '/api': 'http://localhost:8000',
+      '/uploads': 'http://localhost:8000',
+      '/ws': { target: 'http://localhost:8000', ws: true },
+    },
+  },
   test: { environment: 'jsdom', globals: true, setupFiles: ['./src/test-setup.ts'] },
 })

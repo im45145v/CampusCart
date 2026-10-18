@@ -1,5 +1,9 @@
 import { Mic, Sparkles, Square } from 'lucide-react'
-import { useRef, useState, type FormEvent } from 'react'
+import { useCallback, useRef, useState, type FormEvent } from 'react'
+import { RevenueChart, StatusChart } from '@/components/Charts'
+import { PlanEditor } from '@/components/Memberships'
+import { VoucherDesk } from '@/components/Vouchers'
+import { ReviewCard } from '@/components/Reviews'
 import { Link } from 'react-router-dom'
 import { Empty, ErrorState, Loading, Notice } from '@/components/States'
 import { ImageUpload, OrderSettingsEditor, ThemeEditor } from '@/components/StoreEditors'
@@ -10,13 +14,14 @@ import { Card } from '@/components/ui/card'
 import { Field, Input, Select, Textarea } from '@/components/ui/input'
 import { api } from '@/lib/api'
 import { useAuth } from '@/lib/auth'
+import { useLiveOrders } from '@/lib/live'
 import { DEFAULT_ORDER_SETTINGS, DEFAULT_THEME, themeStyle } from '@/lib/theme'
 import { cn, formatMoney, formatTime, rupeesToMinor } from '@/lib/utils'
 import { useFetch } from '@/lib/useFetch'
-import type { Draft, Order, Product, Review, Store, Summary } from '@/lib/types'
+import type { Draft, Order, Plan, Product, Review, SellerCharts, Store, Subscription, Summary, Voucher } from '@/lib/types'
 import { OrderActions, OrderMeta, statusLabel } from './Orders'
 
-const TABS = ['Overview', 'Listings', 'Orders', 'Store', 'Reviews'] as const
+const TABS = ['Overview', 'Listings', 'Orders', 'Plans', 'Offers', 'Store', 'Reviews'] as const
 type Tab = (typeof TABS)[number]
 
 function StoreForm({ store, onSaved }: { store?: Store; onSaved: () => void }) {
@@ -35,7 +40,7 @@ function StoreForm({ store, onSaved }: { store?: Store; onSaved: () => void }) {
     try {
       await api(store ? `/api/stores/${store.id}` : '/api/stores', { method: store ? 'PATCH' : 'POST', body: f })
       await refresh()
-      setMsg({ tone: 'ok', text: 'Saved. Your store page is updated.' })
+      setMsg({ tone: 'ok', text: store ? 'Saved. Your store page is updated.' : 'Submitted. An admin has to approve the store before students can see it. You can add listings while you wait.' })
       onSaved()
     } catch (err) {
       setMsg({ tone: 'bad', text: err instanceof Error ? err.message : 'Save failed' })
@@ -71,7 +76,7 @@ function StoreForm({ store, onSaved }: { store?: Store; onSaved: () => void }) {
         <OrderSettingsEditor value={f.order_settings} onChange={(s) => setF({ ...f, order_settings: s })} />
       </section>
       <div className="flex flex-wrap items-center gap-3">
-        <Button type="submit" size="lg">{store ? 'Save changes' : 'Create store'}</Button>
+        <Button type="submit" size="lg">{store ? 'Save changes' : 'Submit for approval'}</Button>
         {store && <Link className="text-sm text-terracotta underline" to={`/stores/${store.id}`}>View store page</Link>}
       </div>
       {msg && <Notice tone={msg.tone}>{msg.text}</Notice>}
@@ -125,6 +130,8 @@ function Dictation({ onText }: { onText: (t: string) => void }) {
 function ListingForm({ store, onSaved }: { store: Store; onSaved: () => void }) {
   const empty = { title: '', description: '', kind: 'product', listing_type: 'new', category: 'general', price: '', stock: '', prep: '' }
   const [f, setF] = useState(empty)
+  const [extras, setExtras] = useState([{ name: '', price: '', max: '1' }])
+  const [rates, setRates] = useState({ bw: '1', color: '5', a3: '2', staple: '5', spiral: '20', urgent: '25', copies: '20' })
   const [image, setImage] = useState<string | null>(null)
   const [aiText, setAiText] = useState('')
   const [ai, setAi] = useState<{ warnings: string[]; missing: string[] } | null>(null)
@@ -156,12 +163,23 @@ function ListingForm({ store, onSaved }: { store: Store; onSaved: () => void }) 
         method: 'POST',
         body: {
           title: f.title, description: f.description, kind: f.kind, listing_type: f.listing_type, category: f.category || 'general',
-          price_minor: rupeesToMinor(f.price), stock: f.stock === '' ? null : Number(f.stock), prep_time_min: Number(f.prep || 0),
+          price_minor: f.kind === 'printing' ? rupeesToMinor(rates.bw) : rupeesToMinor(f.price),
+          stock: f.kind === 'printing' || f.stock === '' ? null : Number(f.stock), prep_time_min: Number(f.prep || 0),
           image_urls: image ? [image] : [],
+          addons: f.kind === 'printing' ? [] : extras.filter((e) => e.name.trim()).map((e) => ({
+            name: e.name.trim(), price_minor: rupeesToMinor(e.price), max_qty: Math.max(1, Math.min(10, Number(e.max) || 1)),
+          })),
+          ...(f.kind === 'printing' ? { print_spec: {
+            bw_per_page_minor: rupeesToMinor(rates.bw), color_per_page_minor: rupeesToMinor(rates.color),
+            papers: [{ id: 'a4', label: 'A4', extra_per_sheet_minor: 0 }, { id: 'a3', label: 'A3', extra_per_sheet_minor: rupeesToMinor(rates.a3) }],
+            bindings: [{ id: 'none', label: 'No binding', price_minor: 0 }, { id: 'staple', label: 'Staples', price_minor: rupeesToMinor(rates.staple) }, { id: 'spiral', label: 'Spiral', price_minor: rupeesToMinor(rates.spiral) }],
+            allow_duplex: true, urgent_percent: Math.max(0, Math.min(100, Number(rates.urgent) || 0)), max_copies: Math.max(1, Math.min(100, Number(rates.copies) || 20)),
+          } } : {}),
         },
       })
       setMsg({ tone: 'ok', text: 'Saved as a draft. Publish it from the list when you are ready.' })
       setF(empty)
+      setExtras([{ name: '', price: '', max: '1' }])
       setImage(null)
       setAi(null)
       onSaved()
@@ -173,12 +191,12 @@ function ListingForm({ store, onSaved }: { store: Store; onSaved: () => void }) 
     <Card className="space-y-4">
       <h3 className="text-lg font-bold">New listing</h3>
       <div className="space-y-2 rounded-xl bg-ivory p-3">
-        <Field label="Describe it in your own words (optional AI assist)" hint="The assistant only fills fields you state. It never publishes, and it never invents prices or stock.">
+        <Field label="Describe it in your own words (Gemma 4)" hint="Gemma 4 only fills fields you state. It never publishes, and it never invents prices or stock.">
           <Textarea value={aiText} onChange={(e) => setAiText(e.target.value)} placeholder="e.g. selling 10 homemade brownies for 40 rupees each, ready in 30 min" />
         </Field>
         <div className="flex flex-wrap items-center gap-2">
           <Dictation onText={setAiText} />
-          <Button type="button" variant="secondary" size="sm" disabled={busy || aiText.trim().length < 3} onClick={draft}><Sparkles className="h-4 w-4" aria-hidden /> {busy ? 'Working…' : 'Draft with AI'}</Button>
+          <Button type="button" variant="secondary" size="sm" disabled={busy || aiText.trim().length < 3} onClick={draft}><Sparkles className="h-4 w-4" aria-hidden /> {busy ? 'Working…' : 'Draft with Gemma 4'}</Button>
         </div>
         {ai && (
           <div className="space-y-1 text-sm">
@@ -192,13 +210,35 @@ function ListingForm({ store, onSaved }: { store: Store; onSaved: () => void }) 
         <Field label="Title"><Input required minLength={2} value={f.title} onChange={(e) => setF({ ...f, title: e.target.value })} /></Field>
         <Field label="Description"><Textarea value={f.description} onChange={(e) => setF({ ...f, description: e.target.value })} /></Field>
         <div className="grid gap-3 sm:grid-cols-3">
-          <Field label="Type"><Select value={f.kind} onChange={(e) => setF({ ...f, kind: e.target.value })}><option value="product">Product</option><option value="service">Service</option><option value="printing">Printing (manual quote)</option></Select></Field>
+          <Field label="Type"><Select value={f.kind} onChange={(e) => setF({ ...f, kind: e.target.value })}><option value="product">Product</option><option value="service">Service</option><option value="printing">Printing (priced from the file)</option></Select></Field>
           <Field label="Listing"><Select value={f.listing_type} onChange={(e) => setF({ ...f, listing_type: e.target.value })}>{['new', 'secondhand', 'rent', 'lend', 'exchange'].map((c) => <option key={c}>{c}</option>)}</Select></Field>
           <Field label="Category"><Input value={f.category} onChange={(e) => setF({ ...f, category: e.target.value })} /></Field>
-          <Field label="Price (₹)"><Input required type="number" min={0} step="0.01" value={f.price} onChange={(e) => setF({ ...f, price: e.target.value })} /></Field>
+          {f.kind !== 'printing' && <Field label="Price (₹)"><Input required type="number" min={0} step="0.01" value={f.price} onChange={(e) => setF({ ...f, price: e.target.value })} /></Field>}
           <Field label="Stock" hint="Leave empty for unlimited"><Input type="number" min={0} value={f.stock} onChange={(e) => setF({ ...f, stock: e.target.value })} /></Field>
           <Field label="Prep time (min)"><Input type="number" min={0} value={f.prep} onChange={(e) => setF({ ...f, prep: e.target.value })} /></Field>
         </div>
+        {f.kind === 'printing' ? (
+          <div className="grid gap-3 sm:grid-cols-3">
+            <Field label="Black and white ₹ / page"><Input type="number" min={0} step="0.01" value={rates.bw} onChange={(e) => setRates({ ...rates, bw: e.target.value })} /></Field>
+            <Field label="Colour ₹ / page"><Input type="number" min={0} step="0.01" value={rates.color} onChange={(e) => setRates({ ...rates, color: e.target.value })} /></Field>
+            <Field label="A3 extra ₹ / sheet"><Input type="number" min={0} step="0.01" value={rates.a3} onChange={(e) => setRates({ ...rates, a3: e.target.value })} /></Field>
+            <Field label="Staples ₹ / copy"><Input type="number" min={0} step="0.01" value={rates.staple} onChange={(e) => setRates({ ...rates, staple: e.target.value })} /></Field>
+            <Field label="Spiral ₹ / copy"><Input type="number" min={0} step="0.01" value={rates.spiral} onChange={(e) => setRates({ ...rates, spiral: e.target.value })} /></Field>
+            <Field label="Urgent percent"><Input type="number" min={0} max={100} value={rates.urgent} onChange={(e) => setRates({ ...rates, urgent: e.target.value })} /></Field>
+          </div>
+        ) : (
+          <div className="space-y-2">
+            <p className="text-sm font-medium text-forest">Extras, such as a fried egg</p>
+            {extras.map((extra, i) => (
+              <div key={i} className="grid grid-cols-[1fr_7rem_5rem] gap-2">
+                <Input aria-label="Extra name" placeholder="Fried egg" value={extra.name} onChange={(e) => setExtras(extras.map((row, n) => n === i ? { ...row, name: e.target.value } : row))} />
+                <Input aria-label="Extra price in rupees" type="number" min={0} step="0.01" placeholder="₹" value={extra.price} onChange={(e) => setExtras(extras.map((row, n) => n === i ? { ...row, price: e.target.value } : row))} />
+                <Input aria-label="Maximum quantity" type="number" min={1} max={10} value={extra.max} onChange={(e) => setExtras(extras.map((row, n) => n === i ? { ...row, max: e.target.value } : row))} />
+              </div>
+            ))}
+            {extras.length < 8 && <Button type="button" variant="secondary" size="sm" onClick={() => setExtras([...extras, { name: '', price: '', max: '1' }])}>Add an extra</Button>}
+          </div>
+        )}
         <ImageUpload label="Photo" value={image} onChange={setImage} previewClass="h-24 w-24" />
         <Button type="submit">Save draft</Button>
       </form>
@@ -262,6 +302,7 @@ function Listings({ store }: { store: Store }) {
 
 function Overview() {
   const { data, loading, error, reload } = useFetch<Summary>('/api/seller/summary')
+  const charts = useFetch<SellerCharts>('/api/seller/charts')
   const [token, setToken] = useState('')
   if (loading) return <Loading />
   if (error || !data) return <ErrorState message={error ?? 'Failed'} onRetry={reload} />
@@ -273,6 +314,12 @@ function Overview() {
         <Card><p className="text-sm text-taupe">Last 30 days</p><p className="text-2xl font-extrabold">{formatMoney(data.last_30_days.revenue_minor)}</p><p className="text-sm">{data.last_30_days.orders_completed} completed</p></Card>
         <Card><p className="text-sm text-taupe">Open orders</p><p className="text-2xl font-extrabold">{['placed', 'quote_requested', 'quoted', 'accepted', 'preparing', 'ready'].reduce((n, s) => n + (data.orders_by_status[s] ?? 0), 0)}</p></Card>
       </div>
+      {charts.data && (
+        <div className="grid gap-4 lg:grid-cols-2">
+          <Card><RevenueChart days={charts.data.days} /></Card>
+          <Card><StatusChart byStatus={charts.data.by_status} /></Card>
+        </div>
+      )}
       <Card>
         <h3 className="mb-2 font-bold">Low stock</h3>
         {data.low_stock.length ? <ul className="text-sm">{data.low_stock.map((l, i) => <li key={i}>{l.title}{l.variant ? ` / ${l.variant}` : ''}: <strong>{l.stock}</strong> left</li>)}</ul> : <p className="text-sm text-taupe">Nothing running low.</p>}
@@ -289,6 +336,14 @@ function Overview() {
 
 function SellerOrders() {
   const { data, loading, error, reload, setData } = useFetch<Order[]>('/api/seller/orders')
+  const apply = useCallback((order: Order) => {
+    setData((cur) => {
+      if (!cur) return cur
+      if (!cur.some((x) => x.id === order.id)) return [order, ...cur]
+      return cur.map((x) => (x.id === order.id ? order : x))
+    })
+  }, [setData])
+  useLiveOrders(apply)
   if (loading) return <Loading />
   if (error) return <ErrorState message={error} onRetry={reload} />
   if (!data?.length) return <Empty title="No orders yet" />
@@ -313,18 +368,21 @@ function SellerOrders() {
 
 export default function Seller() {
   const { user } = useAuth()
-  const stores = useFetch<Store[]>(user?.roles.includes('seller') ? '/api/stores/mine' : null)
+  const stores = useFetch<Store[]>(user ? '/api/stores/mine' : null)
   const [tab, setTab] = useState<Tab>('Overview')
   const [idx, setIdx] = useState(0)
   const store = stores.data?.[idx]
   const reviews = useFetch<Review[]>(store && tab === 'Reviews' ? `/api/stores/${store.id}/reviews` : null)
+  const plans = useFetch<Plan[]>(store && tab === 'Plans' ? `/api/stores/${store.id}/plans` : null)
+  const members = useFetch<Subscription[]>(store && tab === 'Plans' ? `/api/stores/${store.id}/subscribers` : null)
+  const vouchers = useFetch<Voucher[]>(store && tab === 'Offers' ? `/api/stores/${store.id}/vouchers` : null, { include_paused: true })
 
   if (!user) return <Empty title="Log in to open a store"><Button asChild><Link to="/login" state={{ from: '/seller' }}>Log in</Link></Button></Empty>
   if (stores.loading) return <Loading />
   if (!store) return (
     <div className="mx-auto max-w-xl space-y-4">
-      <h1 className="text-2xl font-extrabold">Open your store</h1>
-      <p className="text-taupe">Tell students what you offer. You can add listings right after.</p>
+      <h1 className="text-2xl font-extrabold">Apply to open a store</h1>
+      <p className="text-taupe">Tell students what you offer. An admin reviews the application before the store appears on campus. You can prepare listings while you wait.</p>
       <Card><StoreForm onSaved={() => void stores.reload()} /></Card>
     </div>
   )
@@ -332,11 +390,20 @@ export default function Seller() {
     <div className="space-y-6" style={themeStyle(store.theme)}>
       <StoreBanner store={store} height="h-32 sm:h-44">
         <div className="flex flex-wrap items-center gap-2 pt-3">
-          <Badge tone={store.is_open ? 'ok' : 'neutral'}>{store.is_open ? 'Open for orders' : 'Closed'}</Badge>
+          <Badge tone={store.status === 'active' ? (store.is_open ? 'ok' : 'neutral') : statusTone(store.status)}>
+            {store.status === 'active' ? (store.is_open ? 'Open for orders' : 'Closed') : store.status === 'pending' ? 'Waiting for approval' : store.status === 'rejected' ? 'Not approved' : store.status}
+          </Badge>
           <Button asChild variant="secondary" size="sm"><Link to={`/stores/${store.id}`}>View store page</Link></Button>
           <Button size="sm" onClick={() => setTab('Store')}>Edit look and rules</Button>
         </div>
       </StoreBanner>
+      {store.status === 'pending' && <Notice tone="ok">This store is waiting for an admin. Students cannot see it or order yet.</Notice>}
+      {store.status === 'rejected' && (
+        <div className="space-y-2">
+          <Notice tone="bad">An admin did not approve this store{store.review_reason ? `: ${store.review_reason}` : ''}. Update it, then submit again.</Notice>
+          <Button size="sm" onClick={async () => { await api(`/api/stores/${store.id}/resubmit`, { method: 'POST' }); await stores.reload() }}>Submit again</Button>
+        </div>
+      )}
       <div className="flex flex-wrap items-center justify-between gap-3">
         <h2 className="text-xl font-extrabold">Seller Studio</h2>
         {stores.data && stores.data.length > 1 && <Select aria-label="Choose store" className="w-48" value={idx} onChange={(e) => setIdx(Number(e.target.value))}>{stores.data.map((s, i) => <option key={s.id} value={i}>{s.name}</option>)}</Select>}
@@ -348,8 +415,20 @@ export default function Seller() {
       {tab === 'Overview' && <Overview />}
       {tab === 'Listings' && <Listings store={store} />}
       {tab === 'Orders' && <SellerOrders />}
+      {tab === 'Plans' && (plans.loading ? <Loading /> : (
+        <div className="space-y-4">
+          <PlanEditor storeId={store.id} plans={plans.data ?? []} onSaved={() => void plans.reload()} />
+          <Card>
+            <h3 className="mb-2 font-bold">Members</h3>
+            {members.data?.length ? <ul className="space-y-1 text-sm">{members.data.map((m) => <li key={m.id}>{m.buyer_name} · {m.title} · {m.status} until {new Date(m.period_end).toLocaleDateString()}</li>)}</ul> : <p className="text-sm text-taupe">No one has subscribed yet.</p>}
+          </Card>
+        </div>
+      ))}
+      {tab === 'Offers' && (vouchers.loading ? <Loading /> : (
+        <VoucherDesk createUrl={`/api/stores/${store.id}/vouchers`} vouchers={vouchers.data ?? []} onSaved={() => void vouchers.reload()} />
+      ))}
       {tab === 'Store' && <StoreForm key={store.id} store={store} onSaved={() => void stores.reload()} />}
-      {tab === 'Reviews' && (reviews.loading ? <Loading /> : reviews.data?.length ? <ul className="space-y-2">{reviews.data.map((r) => <li key={r.id}><Card>{'★'.repeat(r.rating)} <span className="sr-only">{r.rating} out of 5</span> {r.comment} <span className="text-sm text-taupe">by {r.buyer_name}</span></Card></li>)}</ul> : <Empty title="No reviews yet" />)}
+      {tab === 'Reviews' && (reviews.loading ? <Loading /> : reviews.data?.length ? <ul className="space-y-2">{reviews.data.map((r) => <li key={r.id}><ReviewCard review={r} canReply onReplied={() => void reviews.reload()} /></li>)}</ul> : <Empty title="No reviews yet" />)}
     </div>
   )
 }

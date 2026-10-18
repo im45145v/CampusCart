@@ -68,8 +68,64 @@ async def test_draft_requires_seller(client: httpx.AsyncClient, buyer: Actor, us
     assert (await client.post("/api/ai/listing-draft", json={"text": "selling chai"})).status_code == 401
 
 
+async def test_hosted_gemma_4_request_shape() -> None:
+    seen: dict[str, Any] = {}
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        body = json.loads(request.content)
+        seen["url"] = str(request.url)
+        seen["key"] = request.headers.get("x-goog-api-key")
+        seen["body"] = body
+        parts = body["contents"][0]["parts"]
+        if any(isinstance(p, dict) and "inlineData" in p for p in parts):
+            return httpx.Response(200, json={"candidates": [{"content": {"parts": [{"text": "extra egg on fried rice"}]}}]})
+        return httpx.Response(200, json={"candidates": [{"content": {"parts": [
+            {"text": "hidden", "thought": True}, {"text": "thinking aside"},
+        ]}}]})
+
+    provider = llm.GoogleGemmaProvider("gemma-4-26b-a4b-it", "test-key", transport=httpx.MockTransport(handler))
+    assert await provider.complete("system", "note") == "thinking aside"
+    assert seen["url"].endswith("/models/gemma-4-26b-a4b-it:generateContent")
+    assert seen["key"] == "test-key"
+    assert seen["body"]["systemInstruction"]["parts"][0]["text"] == "system"
+    assert await provider.transcribe(b"abc", "audio/webm") == "extra egg on fried rice"
+    assert seen["body"]["contents"][0]["parts"][1]["inlineData"]["mimeType"] == "audio/webm"
+
+
+def test_api_key_selects_hosted_gemma_4(monkeypatch: pytest.MonkeyPatch) -> None:
+    from app.config import get_settings
+
+    monkeypatch.setenv("GEMMA_API_KEY", "studio-key")
+    monkeypatch.setenv("GEMMA_BASE_URL", "")
+    get_settings.cache_clear()
+    try:
+        provider = llm.get_provider()
+        assert isinstance(provider, llm.GoogleGemmaProvider)
+        assert provider.model == "gemma-4-26b-a4b-it"
+    finally:
+        get_settings.cache_clear()
+
+
+class TalkingProvider(FakeProvider):
+    async def transcribe(self, data: bytes, mime: str) -> str:
+        assert data == b"abc" and mime == "audio/webm"
+        return "ten brownies"
+
+
+async def test_dictation_uses_gemma_when_configured(
+    client: httpx.AsyncClient, seller: Actor, store: dict[str, Any], use_provider: Any
+) -> None:
+    assert store["id"]
+    use_provider(TalkingProvider("{}"))
+    r = await client.post(
+        "/api/ai/transcribe", headers=seller.headers,
+        files={"audio": ("a.webm", b"abc", "audio/webm")},
+    )
+    assert r.status_code == 200 and r.json()["transcript"] == "ten brownies"
+
+
 async def test_transcribe_validation(client: httpx.AsyncClient, seller: Actor, store: dict[str, Any]) -> None:
     bad = await client.post("/api/ai/transcribe", headers=seller.headers, files={"audio": ("a.txt", b"hi", "text/plain")})
     assert bad.status_code == 415
     unconfigured = await client.post("/api/ai/transcribe", headers=seller.headers, files={"audio": ("a.webm", b"abc", "audio/webm")})
-    assert unconfigured.status_code == 503  # no ElevenLabs key: text input remains the fallback
+    assert unconfigured.status_code == 503  # no Gemma key: type the listing instead

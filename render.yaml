@@ -19,6 +19,10 @@ services:
         value: campuscart
       - key: CORS_ORIGINS
         sync: false
+      - key: GEMMA_API_KEY
+        sync: false
+      - key: GEMMA_MODEL
+        value: gemma-4-26b-a4b-it
       - key: GEMMA_BASE_URL
         sync: false
       - key: ELEVENLABS_API_KEY

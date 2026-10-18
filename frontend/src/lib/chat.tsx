@@ -52,19 +52,21 @@ export function ChatProvider({ children }: { children: ReactNode }) {
     }
   }, [user, refreshUnread])
 
+  const subscribe = useCallback((l: Listener) => {
+    listeners.current.add(l)
+    return () => listeners.current.delete(l)
+  }, [])
+
   const value = useMemo<ChatState>(
     () => ({
       status,
       unread: user ? unread : 0,
       reconnects,
       send: (f) => client.current?.send(f) ?? false,
-      subscribe: (l) => {
-        listeners.current.add(l)
-        return () => listeners.current.delete(l)
-      },
+      subscribe,
       refreshUnread,
     }),
-    [status, unread, reconnects, user, refreshUnread],
+    [status, unread, reconnects, user, refreshUnread, subscribe],
   )
   return <ChatContext.Provider value={value}>{children}</ChatContext.Provider>
 }

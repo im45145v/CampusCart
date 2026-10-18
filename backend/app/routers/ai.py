@@ -30,7 +30,7 @@ async def listing_draft(
 
 @router.post("/transcribe")
 async def transcribe(
-    request: Request, seller: SellerUser, audio: UploadFile = File(...)
+    request: Request, seller: SellerUser, provider: ProviderDep, audio: UploadFile = File(...)
 ) -> dict[str, str]:
     enforce(request, "stt", 10, 60)
     ctype = audio.content_type or ""
@@ -42,7 +42,7 @@ async def transcribe(
     if not data:
         raise HTTPException(422, "Empty audio")
     try:
-        text = await speech.transcribe(data, ctype, "dictation")
+        text = await speech.transcribe(data, ctype, "dictation", provider)
     except speech.SpeechUnavailable:
         raise HTTPException(
             503, "Voice transcription is unavailable. Please type your listing instead."

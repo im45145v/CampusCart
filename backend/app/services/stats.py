@@ -42,3 +42,23 @@ async def sales_since(db: Database, seller_id: str, days: int | None) -> dict[st
         count += 1
         total += o["total_minor"]
     return {"orders_completed": count, "revenue_minor": total, "since": start.isoformat()}
+
+
+async def seller_charts(db: Database, seller_id: str) -> dict[str, Any]:
+    """14 calendar days of completed revenue, plus a live status mix. Computed in Python so it stays correct on the test database."""
+    start = (now() - timedelta(days=13)).replace(hour=0, minute=0, second=0, microsecond=0)
+    days: dict[str, dict[str, Any]] = {}
+    for i in range(14):
+        key = (start + timedelta(days=i)).date().isoformat()
+        days[key] = {"date": key, "revenue_minor": 0, "orders": 0}
+    by_status: dict[str, int] = {}
+    async for o in db.orders.find({"seller_id": seller_id}):
+        by_status[o["status"]] = by_status.get(o["status"], 0) + 1
+        if o["status"] != "completed":
+            continue
+        ts = o.get("updated_at") or o.get("created_at")
+        key = ts.date().isoformat() if hasattr(ts, "date") else str(ts)[:10]
+        if key in days:
+            days[key]["revenue_minor"] += int(o.get("total_minor") or 0)
+            days[key]["orders"] += 1
+    return {"days": list(days.values()), "by_status": by_status}
