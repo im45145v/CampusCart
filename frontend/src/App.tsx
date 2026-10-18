@@ -1,5 +1,7 @@
 import { BrowserRouter, Route, Routes } from 'react-router-dom'
 import { Layout, RequireAuth } from '@/components/Layout'
+import { Empty } from '@/components/States'
+import { ToastProvider } from '@/components/Toast'
 import { AuthProvider } from '@/lib/auth'
 import { CartProvider } from '@/lib/cartContext'
 import { ChatProvider } from '@/lib/chat'
@@ -22,6 +24,7 @@ export default function App() {
       <AuthProvider>
         <CartProvider>
           <ChatProvider>
+            <ToastProvider>
             <Routes>
               <Route element={<Layout />}>
                 <Route index element={<Home />} />
@@ -41,9 +44,10 @@ export default function App() {
                 <Route path="inbox" element={<RequireAuth><Inbox /></RequireAuth>} />
                 <Route path="seller" element={<Seller />} />
                 <Route path="admin" element={<RequireAuth role="admin"><Admin /></RequireAuth>} />
-                <Route path="*" element={<p className="py-12 text-center text-taupe">Page not found.</p>} />
+                <Route path="*" element={<Empty title="Page not found" />} />
               </Route>
             </Routes>
+            </ToastProvider>
           </ChatProvider>
         </CartProvider>
       </AuthProvider>

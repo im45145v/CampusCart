@@ -11,3 +11,4 @@
 - Edge tokens: random `cc_...` values stored as SHA-256, read-only, revocable, limited to `/api/edge/*`. The UNO Q
   service has a fixed tool list, validated arguments and a Telegram chat allow-list; no shell or database access.
 - Secrets live in environment variables (`.env.example`); `.env` is git-ignored.
+- `ADMIN_UPI_ID` is the public desk UPI shown for top-ups. It is not a secret. `GET /api/payments/desk` returns only that id. A transaction ID typed by the student is not payment proof. Spendable balance increases only when an admin approves the top-up. YouPI-PG is not connected: it confirms by reading bank SMS or email, and a checkout request can mark cash-on-delivery successful from the browser.

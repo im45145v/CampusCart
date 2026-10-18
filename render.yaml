@@ -33,6 +33,8 @@ services:
         sync: false
       - key: PUBLIC_WEB_URL
         sync: false
+      - key: ADMIN_UPI_ID
+        value: im45145v@oksbi
   - type: web
     name: campuscart-web
     runtime: static

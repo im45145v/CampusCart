@@ -2,6 +2,7 @@ import { Clock, Trash2 } from 'lucide-react'
 import { useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { Empty, Loading, Notice } from '@/components/States'
+import { useToast } from '@/components/Toast'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
 import { Field, Input, Select, Textarea } from '@/components/ui/input'
@@ -39,7 +40,7 @@ function SlotPicker({ opts, value, onChange }: { opts: OrderOptions; value: stri
           const key = `${current.date}|${s.label}`
           return (
             <button key={key} type="button" disabled={!s.available} aria-pressed={value === key} onClick={() => onChange(value === key ? '' : key)}
-              className={cn('rounded-lg border px-3 py-1.5 text-sm disabled:cursor-not-allowed disabled:opacity-40', value === key ? 'border-terracotta bg-terracotta text-white' : 'border-line bg-white hover:bg-ivory')}>
+              className={cn('min-h-11 rounded-xl border px-3 py-2 text-sm transition-colors duration-200 disabled:cursor-not-allowed disabled:opacity-40', value === key ? 'border-terracotta bg-terracotta text-on-primary' : 'border-line bg-white hover:bg-mist')}>
               {s.label.replace('-', ' to ')}
               {s.remaining !== null && s.available && <span className="ml-1 text-xs opacity-80">({s.remaining} left)</span>}
               {!s.available && <span className="ml-1 text-xs">{s.remaining === 0 ? '(full)' : '(passed)'}</span>}
@@ -54,6 +55,7 @@ function SlotPicker({ opts, value, onChange }: { opts: OrderOptions; value: stri
 
 function StoreCheckout({ storeId, lines }: { storeId: string; lines: CartLine[] }) {
   const cart = useCart()
+  const toast = useToast()
   const { user } = useAuth()
   const nav = useNavigate()
   const store = useFetch<Store>(`/api/stores/${storeId}`)
@@ -142,7 +144,9 @@ function StoreCheckout({ storeId, lines }: { storeId: string; lines: CartLine[] 
       cart.removeStore(storeId)
       nav(`/orders/${order.id}`)
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Could not place order')
+      const message = e instanceof Error ? e.message : 'Could not place order'
+      setError(message)
+      toast('bad', message)
       void options.reload()
     } finally {
       setBusy(false)
@@ -156,14 +160,14 @@ function StoreCheckout({ storeId, lines }: { storeId: string; lines: CartLine[] 
       {opts?.order_instructions && <Notice tone="ok">{opts.order_instructions}</Notice>}
       <ul className="divide-y divide-line">
         {lines.map((l, i) => (
-          <li key={lineKey(l)} className="flex items-center justify-between gap-3 py-2">
+          <li key={lineKey(l)} className="flex flex-col gap-2 py-3 sm:flex-row sm:items-center sm:justify-between">
             <div>
               <p className="font-medium">{l.title}</p>
               {l.variantName && <p className="text-sm text-taupe">{l.variantName}</p>}
               {l.addons?.map((a) => <p key={a.id} className="text-sm text-taupe">{a.quantity} × {a.name} (+{formatMoney(a.priceMinor)})</p>)}
               {l.printJob && <p className="text-sm text-taupe">{l.printJob.pages} pages · {l.printJob.copies} copies · {l.printJob.paperLabel} · {l.printJob.color === 'color' ? 'colour' : 'black and white'} · {l.printJob.bindingLabel}</p>}
             </div>
-            <div className="flex items-center gap-2">
+            <div className="flex flex-wrap items-center gap-2">
               {!l.printJob && <><label className="sr-only" htmlFor={`q-${lineKey(l)}`}>Quantity for {l.title}</label>
               <Input id={`q-${lineKey(l)}`} type="number" min={1} max={maxQty} className="w-20" value={l.quantity} onChange={(e) => cart.setQty(lineKey(l), Math.min(maxQty, Number(e.target.value) || 1))} /></>}
               <span className="w-28 text-right text-sm">
@@ -171,7 +175,7 @@ function StoreCheckout({ storeId, lines }: { storeId: string; lines: CartLine[] 
                   ? `${formatMoney(l.unitPriceMinor)} / ${l.rateUnit} × ${charges[i].units}`
                   : l.rateUnit ? `${formatMoney(l.unitPriceMinor)} / ${l.rateUnit}` : formatMoney(lineEstimate(l))}
               </span>
-              <Button variant="ghost" size="sm" aria-label={`Remove ${l.title}`} onClick={() => cart.setQty(lineKey(l), 0)}><Trash2 className="h-4 w-4" aria-hidden /></Button>
+              <Button variant="ghost" size="sm" className="h-11 w-11" aria-label={`Remove ${l.title}`} onClick={() => cart.setQty(lineKey(l), 0)}><Trash2 className="h-4 w-4" aria-hidden /></Button>
             </div>
           </li>
         ))}
@@ -248,6 +252,7 @@ export default function Cart() {
   return (
     <div className="space-y-6">
       <h1 className="text-2xl font-extrabold">Cart</h1>
+      <p className="text-sm text-taupe">Review each stall, then place the order. Payment follows that stall’s rules.</p>
       {groups.size > 1 && <p className="text-sm text-taupe">Each stall gets its own order.</p>}
       {[...groups].map(([storeId, ls]) => <StoreCheckout key={storeId} storeId={storeId} lines={ls} />)}
     </div>

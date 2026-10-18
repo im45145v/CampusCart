@@ -1,6 +1,6 @@
 from functools import lru_cache
 
-from pydantic import Field
+from pydantic import Field, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -36,6 +36,20 @@ class Settings(BaseSettings):
     public_web_url: str = "http://localhost:5173"
     otp_ttl_minutes: int = 10
     otp_max_attempts: int = 5
+
+    # Shown on the add-funds form. Public payment address, not a secret.
+    # A typed UPI reference is not proof; an admin still has to approve the top-up.
+    admin_upi_id: str = "im45145v@oksbi"
+
+    @field_validator("admin_upi_id")
+    @classmethod
+    def clean_admin_upi(cls, value: str) -> str:
+        cleaned = value.strip()
+        if not cleaned:
+            return "im45145v@oksbi"
+        if len(cleaned) > 80 or "@" not in cleaned or any(ch.isspace() for ch in cleaned):
+            raise ValueError("ADMIN_UPI_ID must be a UPI id such as name@bank")
+        return cleaned
 
     def validate_for_runtime(self) -> None:
         if self.environment == "production" and self.jwt_secret.startswith("dev-insecure"):

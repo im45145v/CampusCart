@@ -24,6 +24,7 @@ This is the data layer behind the app. Atlas Vector Search is not wired up.
    - `RESEND_API_KEY` — Resend API key, required before email sign-in works in production.
    - `EMAIL_FROM` — a sender Resend will accept, for example `CampusCart <login@yourdomain.com>`. Until a domain is verified, Resend only delivers from `onboarding@resend.dev` to the address on the Resend account.
    - `PUBLIC_WEB_URL` — the static site origin, `https://…`, no trailing slash. Magic links in the email point here.
+   - `ADMIN_UPI_ID` — desk UPI shown when a student adds wallet funds. The blueprint default is `im45145v@oksbi`. It is a public address, not a secret. Changing it does not verify payments.
 3. On `campuscart-web`, set `VITE_API_URL` to the API origin, for example `https://campuscart-api.onrender.com`, with no trailing slash. Rebuild the static site after changing it. The browser derives the chat socket from that URL.
 4. Confirm `GET https://<api>/api/health` returns ok.
 5. From a machine that can reach Atlas, run `python -m scripts.seed_campus_stores` with `MONGODB_URI` pointing at the same cluster and the script's API base (`http://127.0.0.1:8000` in the script) changed only if you seed through a tunnel. The script talks to the API, so the simplest path is to seed a local API whose `MONGODB_URI` is the Atlas cluster.

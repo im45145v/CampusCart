@@ -1,11 +1,12 @@
 import { useState } from 'react'
 import { Empty, ErrorState, Loading, Notice } from '@/components/States'
 import { Badge, statusTone } from '@/components/ui/badge'
+import { tabClass } from '@/components/ui/tabs'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { api } from '@/lib/api'
-import { cn, formatMoney, formatTime } from '@/lib/utils'
+import { formatMoney, formatTime } from '@/lib/utils'
 import { useFetch } from '@/lib/useFetch'
 import { VoucherDesk } from '@/components/Vouchers'
 import type { Message, Report, Store, User, Voucher, WalletEntry } from '@/lib/types'
@@ -19,33 +20,51 @@ function Applications() {
   const { data, loading, error, reload } = useFetch<Store[]>('/api/admin/stores', { status: 'pending' })
   const [reason, setReason] = useState<Record<string, string>>({})
   const [err, setErr] = useState('')
+  const [deciding, setDeciding] = useState('')
   if (loading) return <Loading />
   if (error) return <ErrorState message={error} onRetry={reload} />
-  if (!data?.length) return <Empty title="No store applications waiting" />
   const decide = async (id: string, decision: 'approved' | 'rejected') => {
+    if (deciding) return
+    const note = (reason[id] ?? '').trim()
+    if (note.length < 3) {
+      setErr('Write at least 3 characters. The seller sees this note if you reject the stall.')
+      return
+    }
     setErr('')
+    setDeciding(id)
     try {
-      await api(`/api/admin/stores/${id}/decision`, { method: 'POST', body: { decision, reason: reason[id] ?? '' } })
+      await api(`/api/admin/stores/${id}/decision`, { method: 'POST', body: { decision, reason: note } })
       await reload()
     } catch (e) { setErr(e instanceof Error ? e.message : 'Failed') }
+    finally { setDeciding('') }
   }
   return (
-    <ul className="space-y-3">
-      {data.map((s) => (
-        <li key={s.id}>
-          <Card className="space-y-2">
-            <p className="font-semibold">{s.name} <Badge tone="warn">pending</Badge> <span className="text-sm font-normal text-taupe">{s.category}</span></p>
-            <p className="text-sm text-taupe">{s.description}</p>
-            <div className="flex flex-wrap gap-2">
-              <Input aria-label={`Note for ${s.name}`} className="min-w-60 flex-1" placeholder="Why you approve or reject it" value={reason[s.id] ?? ''} onChange={(e) => setReason({ ...reason, [s.id]: e.target.value })} />
-              <Button onClick={() => decide(s.id, 'approved')}>Approve</Button>
-              <Button variant="secondary" onClick={() => decide(s.id, 'rejected')}>Reject</Button>
-            </div>
-          </Card>
-        </li>
-      ))}
+    <div className="space-y-3">
+      <div>
+        <h2 className="text-lg font-bold">Stall applications</h2>
+        <p className="text-sm text-taupe">Pending stalls stay hidden. Students cannot see them or place an order until you approve. A rejected stall returns to this queue after the seller edits it and submits again. Nothing here is approved automatically.</p>
+      </div>
+      {!data?.length ? <Empty title="No stall applications waiting">When a seller submits again, the stall shows up here as pending.</Empty> : (
+        <ul className="space-y-3">
+          {data.map((s) => (
+            <li key={s.id}>
+              <Card className="space-y-2">
+                <p className="font-semibold">{s.name} <Badge tone="warn">Pending</Badge> <span className="text-sm font-normal text-taupe">{s.category}</span></p>
+                <p className="text-sm text-taupe">{s.description}</p>
+                {s.pickup_details && <p className="text-sm">Pickup: {s.pickup_details}</p>}
+                {s.created_at && <p className="text-xs text-taupe">Submitted {formatTime(s.created_at)}</p>}
+                <div className="flex flex-wrap gap-2">
+                  <Input aria-label={`Note for ${s.name}`} className="min-w-60 flex-1" placeholder="Why you approve or reject it (required)" value={reason[s.id] ?? ''} onChange={(e) => setReason({ ...reason, [s.id]: e.target.value })} />
+                  <Button disabled={!!deciding || (reason[s.id] ?? '').trim().length < 3} onClick={() => decide(s.id, 'approved')}>Approve</Button>
+                  <Button variant="secondary" disabled={!!deciding || (reason[s.id] ?? '').trim().length < 3} onClick={() => decide(s.id, 'rejected')}>Reject</Button>
+                </div>
+              </Card>
+            </li>
+          ))}
+        </ul>
+      )}
       {err && <Notice tone="bad">{err}</Notice>}
-    </ul>
+    </div>
   )
 }
 
@@ -99,7 +118,7 @@ function Users() {
   }
   return (
     <div className="space-y-2">
-      {data?.map((u) => <Card key={u.id} className="flex items-center justify-between"><div><p className="font-semibold">{u.name} <span className="text-sm font-normal text-taupe">{u.email}</span></p><p className="text-xs text-taupe">{u.roles.join(', ')}</p></div><Button size="sm" variant={u.is_active ? 'secondary' : 'primary'} onClick={() => toggle(u)}>{u.is_active ? 'Deactivate' : 'Reactivate'}</Button></Card>)}
+      {data?.map((u) => <Card key={u.id} className="flex flex-wrap items-center justify-between gap-3"><div><p className="font-semibold">{u.name} <span className="text-sm font-normal text-taupe">{u.email}</span></p><p className="text-xs text-taupe">{u.roles.join(', ')}</p></div><Button size="sm" variant={u.is_active ? 'secondary' : 'primary'} onClick={() => toggle(u)}>{u.is_active ? 'Deactivate' : 'Reactivate'}</Button></Card>)}
       {err && <Notice tone="bad">{err}</Notice>}
     </div>
   )
@@ -118,65 +137,91 @@ function Stores() {
   }
   return (
     <div className="space-y-2">
-      {data?.map((s) => <Card key={s.id} className="flex items-center justify-between"><p className="font-semibold">{s.name} <Badge tone={statusTone(s.status)}>{s.status}</Badge></p><Button size="sm" variant="secondary" onClick={() => toggle(s)}>{s.status === 'active' ? 'Suspend' : 'Reactivate'}</Button></Card>)}
+      {data?.map((s) => <Card key={s.id} className="flex flex-wrap items-center justify-between gap-3"><p className="font-semibold">{s.name} <Badge tone={statusTone(s.status)}>{s.status}</Badge></p>{s.status === 'active' || s.status === 'suspended' ? <Button size="sm" variant="secondary" onClick={() => toggle(s)}>{s.status === 'active' ? 'Suspend' : 'Reactivate'}</Button> : <p className="text-sm text-taupe">{s.status === 'pending' ? 'Waiting in Applications' : 'Seller can submit again'}</p>}</Card>)}
       {err && <Notice tone="bad">{err}</Notice>}
     </div>
   )
 }
 
 function Funds() {
-  const queue = useFetch<WalletEntry[]>('/api/admin/wallet', { status: 'requested' })
-  const topups = useFetch<WalletEntry[]>('/api/admin/wallet', { status: 'posted', reason: 'topup' })
+  const payouts = useFetch<WalletEntry[]>('/api/admin/wallet', { status: 'requested', reason: 'withdrawal' })
+  const waiting = useFetch<WalletEntry[]>('/api/admin/wallet', { status: 'requested', reason: 'topup' })
+  const posted = useFetch<WalletEntry[]>('/api/admin/wallet', { status: 'posted', reason: 'topup' })
   const [err, setErr] = useState('')
-  const act = async (id: string, action: 'paid' | 'return' | 'reverse') => {
+  const [pending, setPending] = useState('')
+  const act = async (id: string, action: 'paid' | 'return' | 'reverse' | 'approve' | 'reject') => {
+    if (pending) return
     setErr('')
+    setPending(id + action)
     try {
       await api(`/api/admin/wallet/${id}/${action}`, { method: 'POST' })
-      await queue.reload()
-      await topups.reload()
+      await payouts.reload()
+      await waiting.reload()
+      await posted.reload()
     } catch (e) { setErr(e instanceof Error ? e.message : 'Failed') }
+    finally { setPending('') }
   }
-  if (queue.loading || topups.loading) return <Loading />
-  if (queue.error) return <ErrorState message={queue.error} onRetry={queue.reload} />
+  if (payouts.loading || waiting.loading || posted.loading) return <Loading />
+  if (payouts.error) return <ErrorState message={payouts.error} onRetry={payouts.reload} />
   return (
     <div className="space-y-3">
       <h2 className="text-lg font-bold">Payout requests</h2>
-      <p className="text-sm text-taupe">Payouts already left the student's spendable balance. Mark paid when the desk hands the money over, or return it to the wallet.</p>
-      {queue.data?.length ? (
+      <p className="text-sm text-taupe">Status: requested. The amount has already left the student&apos;s spendable balance. Mark paid when the desk hands the money over, or return it to the wallet. A second click does not pay it twice.</p>
+      {payouts.data?.length ? (
         <ul className="space-y-2">
-          {queue.data.map((e) => (
+          {payouts.data.map((e) => (
             <li key={e.id}>
               <Card className="flex flex-wrap items-center justify-between gap-3">
                 <div>
-                  <p className="font-semibold">{formatMoney(e.amount_minor)} · {e.note || 'No note'}</p>
-                  <p className="text-xs text-taupe">{formatTime(e.created_at)} · user {(e.user_id ?? '').slice(0, 8)}</p>
+                  <p className="font-semibold">{formatMoney(e.amount_minor)} <Badge tone="warn">Requested</Badge></p>
+                  <p className="text-xs text-taupe">{formatTime(e.created_at)} · {e.note || 'No note'} · user {(e.user_id ?? '').slice(0, 8)}</p>
                 </div>
                 <div className="flex gap-2">
-                  <Button size="sm" onClick={() => act(e.id, 'paid')}>Mark paid</Button>
-                  <Button size="sm" variant="secondary" onClick={() => act(e.id, 'return')}>Return to wallet</Button>
+                  <Button size="sm" disabled={!!pending} onClick={() => act(e.id, 'paid')}>Mark paid</Button>
+                  <Button size="sm" variant="secondary" disabled={!!pending} onClick={() => act(e.id, 'return')}>Return to wallet</Button>
                 </div>
               </Card>
             </li>
           ))}
         </ul>
       ) : <p className="text-sm text-taupe">No payouts waiting.</p>}
-      <h2 className="pt-2 text-lg font-bold">Recent top-ups</h2>
-      <p className="text-sm text-taupe">Reverse a top-up only if the desk did not take the money. The balance is debited, and it fails if those credits were already spent.</p>
-      {topups.data?.length ? (
+      <h2 className="pt-2 text-lg font-bold">Top-ups waiting</h2>
+      <p className="text-sm text-taupe">Status: requested. The transaction ID is what the student typed. It does not prove the UPI payment arrived. Approve only after you see the money, and only then does the spendable balance increase. Decline leaves the balance unchanged.</p>
+      {waiting.data?.length ? (
         <ul className="space-y-2">
-          {topups.data.map((e) => (
+          {waiting.data.map((e) => (
             <li key={e.id}>
               <Card className="flex flex-wrap items-center justify-between gap-3">
                 <div>
-                  <p className="font-semibold">{formatMoney(e.amount_minor)} · {e.method ?? 'top-up'}</p>
-                  <p className="text-xs text-taupe">{formatTime(e.created_at)} · {e.note || 'No note'} · user {(e.user_id ?? '').slice(0, 8)}</p>
+                  <p className="font-semibold">{formatMoney(e.amount_minor)} <Badge tone="warn">Requested</Badge></p>
+                  <p className="text-xs text-taupe">{formatTime(e.created_at)} · UPI transaction {e.transaction_id || 'missing'} · {e.note || 'No note'} · user {(e.user_id ?? '').slice(0, 8)}</p>
                 </div>
-                <Button size="sm" variant="secondary" onClick={() => act(e.id, 'reverse')}>Reverse</Button>
+                <div className="flex gap-2">
+                  <Button size="sm" disabled={!!pending} onClick={() => act(e.id, 'approve')}>Approve</Button>
+                  <Button size="sm" variant="secondary" disabled={!!pending} onClick={() => act(e.id, 'reject')}>Decline</Button>
+                </div>
               </Card>
             </li>
           ))}
         </ul>
-      ) : <p className="text-sm text-taupe">No posted top-ups.</p>}
+      ) : <p className="text-sm text-taupe">No top-ups waiting.</p>}
+      <h2 className="pt-2 text-lg font-bold">Confirmed top-ups</h2>
+      <p className="text-sm text-taupe">Status: in the spendable balance. Reverse one only if the desk did not take the money. The balance is debited, and it fails if those credits were already spent.</p>
+      {posted.data?.length ? (
+        <ul className="space-y-2">
+          {posted.data.map((e) => (
+            <li key={e.id}>
+              <Card className="flex flex-wrap items-center justify-between gap-3">
+                <div>
+                  <p className="font-semibold">{formatMoney(e.amount_minor)} <Badge tone="ok">In balance</Badge></p>
+                  <p className="text-xs text-taupe">{formatTime(e.created_at)} · UPI transaction {e.transaction_id || 'none'} · {e.note || 'No note'} · user {(e.user_id ?? '').slice(0, 8)}</p>
+                </div>
+                <Button size="sm" variant="secondary" disabled={!!pending} onClick={() => act(e.id, 'reverse')}>Reverse</Button>
+              </Card>
+            </li>
+          ))}
+        </ul>
+      ) : <p className="text-sm text-taupe">No confirmed top-ups.</p>}
       {err && <Notice tone="bad">{err}</Notice>}
     </div>
   )
@@ -194,9 +239,11 @@ function AuditLog() {
   if (loading) return <Loading />
   if (error) return <ErrorState message={error} onRetry={reload} />
   return (
-    <Card className="overflow-x-auto">
-      <table className="w-full text-left text-sm"><thead><tr><th className="p-1">When</th><th>Action</th><th>Target</th><th>Actor</th></tr></thead>
-        <tbody>{data?.map((a) => <tr key={a.id} className="border-t border-line"><td className="p-1">{formatTime(a.created_at)}</td><td>{a.action}</td><td>{a.target_type} {a.target_id.slice(0, 8)}</td><td>{a.actor_id.slice(0, 8)}</td></tr>)}</tbody></table>
+    <Card className="overflow-x-auto p-0">
+      <table className="w-full min-w-[40rem] text-left text-sm">
+        <thead className="text-taupe"><tr><th className="px-4 py-3 font-medium">When</th><th className="px-4 py-3 font-medium">Action</th><th className="px-4 py-3 font-medium">Target</th><th className="px-4 py-3 font-medium">Actor</th></tr></thead>
+        <tbody>{data?.map((a) => <tr key={a.id} className="border-t border-line"><td className="px-4 py-3">{formatTime(a.created_at)}</td><td className="px-4 py-3">{a.action}</td><td className="px-4 py-3">{a.target_type} {a.target_id.slice(0, 8)}</td><td className="px-4 py-3">{a.actor_id.slice(0, 8)}</td></tr>)}</tbody>
+      </table>
     </Card>
   )
 }
@@ -206,8 +253,8 @@ export default function Admin() {
   return (
     <div className="space-y-6">
       <h1 className="text-2xl font-extrabold">Administration</h1>
-      <div role="tablist" className="flex gap-1 border-b border-line">
-        {TABS.map((t) => <button key={t} role="tab" aria-selected={tab === t} onClick={() => setTab(t)} className={cn('rounded-t-lg px-4 py-2 text-sm font-semibold', tab === t ? 'bg-forest text-white' : 'text-forest hover:bg-forest/10')}>{t}</button>)}
+      <div role="tablist" aria-label="Administration" className="flex gap-2 overflow-x-auto pb-1">
+        {TABS.map((t) => <button key={t} type="button" role="tab" aria-selected={tab === t} onClick={() => setTab(t)} className={tabClass(tab === t)}>{t}</button>)}
       </div>
       {tab === 'Applications' && <Applications />}
       {tab === 'Reports' && <Reports />}

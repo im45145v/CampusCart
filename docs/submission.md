@@ -52,4 +52,4 @@ flowchart LR
 
 Chat and live order updates share one socket. The socket accepts the page only when its origin is listed in `CORS_ORIGINS`. Uploaded print files sit on the API disk, which does not survive a Render restart. The seeded stalls do not depend on those files.
 
-Wallet credits are an on-campus ledger: a student records a top-up, and staff can reverse it. Tanuj Prints and Potato's Makerspace take those credits when the price is known and do not offer cash at collection. Kaaram & Ko and Campus Brewers still take cash at pickup. A cancel or rejection returns the credits once. Karma, if a listing has it, is not money.
+Wallet credits are an on-campus ledger: a student submits a UPI transaction ID, and staff approve it before the credits can be spent. Staff can still reverse a posted top-up. Tanuj Prints and Potato's Makerspace take those credits when the price is known and do not offer cash at collection. Kaaram & Ko and Campus Brewers still take cash at pickup. A cancel or rejection returns the credits once. Karma, if a listing has it, is not money.

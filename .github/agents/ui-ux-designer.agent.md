@@ -11,7 +11,7 @@ tools: ["read", "search"]
 
 ## Scope
 - Review route structure, page hierarchy, forms, empty states, error states, and seller/buyer action clarity in `frontend/src/`.
-- Preserve theme usage: background `#F7F4ED`, cards `#FFFFFF`, primary `#C65D3A`, headings/nav `#263D32`, charcoal text, muted taupe support, Manrope headings, Inter body.
+- Preserve theme usage: background `#F7F5EF`, cards `#FFFFFF`, primary teal `#20B8A5`, hover `#159786`, midnight nav and headings `#142B3B`, gold `#FFC857` for small highlights, text `#182B36`, secondary `#64748B`, borders `#E5E5DD`, Manrope headings, Inter body. Teal buttons use midnight text. Stall themes may recolor a stall’s own pages.
 - Ensure copy reflects true system behavior such as manual payment confirmation, AI drafting only, and ticket-based chat transport.
 
 ## Boundaries

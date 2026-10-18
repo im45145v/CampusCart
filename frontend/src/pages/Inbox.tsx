@@ -118,9 +118,9 @@ function Thread({ conv }: { conv: Conversation }) {
   if (loading) return <Loading />
   return (
     <div className="flex h-[70vh] flex-col rounded-2xl border border-line bg-card">
-      <div className="flex items-center justify-between border-b border-line p-3">
-        <div>
-          <p className="font-bold">{conv.other_user.name}</p>
+      <div className="flex items-center justify-between gap-3 border-b border-line p-3">
+        <div className="min-w-0">
+          <p className="font-semibold">{conv.other_user.name}</p>
           <p className="text-xs text-taupe">
             <span className={conv.other_user.online ? 'text-ok' : undefined}>{conv.other_user.online ? 'Online' : 'Offline'}</span>
             {' · '}{conv.store_name}{conv.order_id ? ' · about an order' : ''}
@@ -134,9 +134,9 @@ function Thread({ conv }: { conv: Conversation }) {
           const mine = m.sender_id === user?.id
           return (
             <div key={m.id} className={cn('flex', mine ? 'justify-end' : 'justify-start')}>
-              <div className={cn('max-w-[80%] rounded-2xl px-3 py-2 text-sm', mine ? 'bg-forest text-white' : 'bg-ivory', pending.includes(m) && 'opacity-60')}>
+              <div className={cn('max-w-[80%] rounded-2xl px-3 py-2 text-sm', mine ? 'bg-terracotta text-on-primary' : 'bg-mist text-ink', pending.includes(m) && 'opacity-60')}>
                 <p className="whitespace-pre-wrap break-words">{m.text}</p>
-                <p className={cn('mt-1 text-[11px]', mine ? 'text-white/70' : 'text-taupe')}>{pending.includes(m) ? 'Sending…' : formatTime(m.created_at)}{mine && !pending.includes(m) && m.seq <= otherRead ? ' · Seen' : ''}</p>
+                <p className={cn('mt-1 text-[11px]', mine ? 'text-on-primary/70' : 'text-taupe')}>{pending.includes(m) ? 'Sending…' : formatTime(m.created_at)}{mine && !pending.includes(m) && m.seq <= otherRead ? ' · Seen' : ''}</p>
               </div>
             </div>
           )
@@ -206,19 +206,26 @@ export default function Inbox() {
           : <p role="status" className="flex items-center gap-1 text-sm text-warn"><WifiOff className="h-4 w-4" aria-hidden /> {chat.status === 'connecting' ? 'Connecting…' : 'Reconnecting… messages still send.'}</p>}
       </div>
       {loading && !data ? <Loading /> : error && !data ? <ErrorState message={error} onRetry={reload} /> : !data?.length ? <Empty title="No conversations yet">Message a seller from a store, product or order page.</Empty> : (
-        <div className="grid gap-4 md:grid-cols-[320px_1fr]">
-          <ul className="space-y-2" aria-label="Conversations">
+        <div className="grid gap-4 md:grid-cols-[280px_1fr]">
+          <ul className={cn('space-y-2', active && 'hidden md:block')} aria-label="Conversations">
             {data.map((c) => (
               <li key={c.id}>
-                <button onClick={() => setSp({ c: c.id })} aria-current={c.id === active?.id} className={cn('w-full rounded-xl border border-line bg-card p-3 text-left hover:bg-ivory', c.id === active?.id && 'border-terracotta')}>
-                  <div className="flex items-center justify-between"><span className="flex items-center gap-2 font-semibold">{c.other_user.online && <span className="h-2 w-2 rounded-full bg-ok" aria-label="Online" />}{c.other_user.name}</span>{c.unread > 0 && <span className="rounded-full bg-terracotta px-2 text-xs text-white" aria-label={`${c.unread} unread`}>{c.unread}</span>}</div>
+                <button type="button" onClick={() => setSp({ c: c.id })} aria-current={c.id === active?.id} className={cn('w-full rounded-2xl border border-line bg-card p-3 text-left transition-colors duration-200 hover:bg-mist', c.id === active?.id && 'border-terracotta bg-mist')}>
+                  <div className="flex items-center justify-between gap-2"><span className="flex min-w-0 items-center gap-2 font-semibold"><span className={cn('h-2 w-2 shrink-0 rounded-full', c.other_user.online ? 'bg-ok' : 'bg-line')} aria-label={c.other_user.online ? 'Online' : 'Offline'} />{c.other_user.name}</span>{c.unread > 0 && <span className="rounded-full bg-terracotta px-2 text-xs text-on-primary" aria-label={`${c.unread} unread`}>{c.unread}</span>}</div>
                   <p className="text-xs text-taupe">{c.store_name}</p>
                   <p className="truncate text-sm text-taupe">{c.last_message?.text ?? 'No messages yet'}</p>
                 </button>
               </li>
             ))}
           </ul>
-          {active ? <Thread key={active.id} conv={active} /> : <Empty title="Select a conversation" />}
+          <div className={cn(!active && 'hidden md:block')}>
+            {active ? (
+              <div className="space-y-2">
+                <Button variant="ghost" size="sm" className="md:hidden" onClick={() => setSp({})}>Back to conversations</Button>
+                <Thread key={active.id} conv={active} />
+              </div>
+            ) : <Empty title="Select a conversation" />}
+          </div>
         </div>
       )}
     </div>

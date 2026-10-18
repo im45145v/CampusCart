@@ -74,7 +74,9 @@ export default function AuthPage() {
   }
 
   return (
-    <Card className="mx-auto max-w-md space-y-4">
+    <div className="mx-auto max-w-md space-y-4 pt-2">
+      <p className="text-center font-heading text-lg font-extrabold tracking-tight">Campus<span className="text-terracotta">Cart</span></p>
+      <Card className="space-y-4">
       <div>
         <h1 className="text-2xl font-extrabold">Sign in</h1>
         <p className="mt-1 text-sm text-taupe">
@@ -153,6 +155,7 @@ export default function AuthPage() {
         <Link className="text-terracotta underline" to="/help">How sign-in works</Link>
       </p>
     </Card>
+    </div>
   )
 }
 

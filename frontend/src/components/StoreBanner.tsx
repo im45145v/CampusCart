@@ -16,7 +16,7 @@ export function StoreBanner({ store, children, height = 'h-40 sm:h-56' }: { stor
   const t = { ...DEFAULT_THEME, ...store.theme }
   return (
     <section aria-label={`${store.name} header`} className="overflow-hidden rounded-2xl border border-line bg-card">
-      <div className={`relative w-full ${height}`} style={{ background: `linear-gradient(135deg, ${t.accent}, ${t.primary})` }}>
+      <div className={`relative w-full overflow-hidden ${height}`} style={{ background: t.primary }}>
         {store.banner_url && <img src={store.banner_url} alt="" referrerPolicy="no-referrer" className="h-full w-full object-cover" />}
       </div>
       <div className="flex flex-wrap items-end gap-4 px-5 pb-5">

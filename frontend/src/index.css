@@ -2,30 +2,71 @@
 @import '@fontsource-variable/inter';
 @import 'tailwindcss';
 
+/* terracotta / forest / ivory stay so stall themes can override them.
+   Defaults: teal actions, midnight headings, warm ivory pages.
+   on-primary is midnight because white on #20B8A5 is about 2.5:1. */
 @theme {
-  --color-ivory: #f7f4ed;
+  --color-ivory: #f7f5ef;
   --color-card: #ffffff;
-  --color-terracotta: #c65d3a;
-  --color-terracotta-dark: #a94a2b;
-  --color-forest: #263d32;
-  --color-ink: #2b2b2b;
-  --color-taupe: #6f6559;
-  --color-line: #e6dfd1;
-  --color-ok: #2f6b45;
-  --color-warn: #8a5a00;
-  --color-bad: #a3302a;
-  --font-heading: 'Manrope Variable', 'DM Sans', system-ui, sans-serif;
+  --color-terracotta: #20b8a5;
+  --color-terracotta-dark: #159786;
+  --color-forest: #142b3b;
+  --color-ink: #182b36;
+  --color-taupe: #64748b;
+  --color-line: #e5e5dd;
+  --color-mist: #efece3;
+  --color-gold: #ffc857;
+  --color-on-primary: #142b3b;
+  --color-ok: #15803d;
+  --color-warn: #a16207;
+  --color-bad: #b91c1c;
+  --font-heading: 'Manrope Variable', 'Inter Variable', system-ui, sans-serif;
   --font-body: 'Inter Variable', system-ui, sans-serif;
+  --animate-pop: pop 200ms ease-out;
+  --animate-toast: toast-in 200ms ease-out;
+  --animate-heart: heart 220ms ease-out;
+  --animate-rise: rise 180ms ease-out;
+}
+
+@keyframes pop {
+  0% { transform: scale(0.7); }
+  70% { transform: scale(1.12); }
+  100% { transform: scale(1); }
+}
+@keyframes toast-in {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+@keyframes heart {
+  0% { transform: scale(1); }
+  40% { transform: scale(1.28); }
+  100% { transform: scale(1); }
+}
+@keyframes rise {
+  from { opacity: 0; transform: translateY(4px); }
+  to { opacity: 1; transform: translateY(0); }
 }
 
 @layer base {
+  html { scroll-behavior: smooth; }
   body {
-    @apply bg-ivory font-body text-ink antialiased;
+    @apply overflow-x-clip bg-ivory font-body text-ink antialiased;
   }
   h1, h2, h3, h4 {
-    @apply font-heading text-forest;
+    @apply font-heading tracking-tight text-forest;
   }
   :focus-visible {
     @apply outline-2 outline-offset-2 outline-terracotta;
+  }
+  img { @apply max-w-full; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html { scroll-behavior: auto; }
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
   }
 }

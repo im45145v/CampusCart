@@ -14,7 +14,7 @@ When to use
 
 Procedure
 1. Locate the route, page, or component in `frontend/src/` and prefer existing primitives from `frontend/src/components/ui/`.
-2. Apply the CampusCart theme: background `#F7F4ED`, cards `#FFFFFF`, primary `#C65D3A`, headings/nav `#263D32`, Manrope headings, Inter body.
+2. Apply the CampusCart theme: background `#F7F5EF`, cards `#FFFFFF`, primary teal `#20B8A5`, hover `#159786`, midnight nav and headings `#142B3B`, gold `#FFC857` for small highlights, text `#182B36`, secondary `#64748B`, borders `#E5E5DD`, Manrope headings, Inter body. Teal buttons use midnight text. Stall themes may recolor a stall’s own pages.
 3. Reflect real backend constraints such as manual payment confirmation, AI draft-only behavior, and chat recovery semantics.
 4. Add or update frontend tests for logic-heavy changes.
 5. Record any contract mismatch that needs `backend-api-engineer` follow-up.
