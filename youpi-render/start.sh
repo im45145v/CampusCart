@@ -19,6 +19,8 @@ export GMAIL_OBSERVER_PORT="${GMAIL_OBSERVER_PORT:-6003}"
 export SMS_OBSERVER_PORT="${SMS_OBSERVER_PORT:-6002}"
 export GMAIL_REDIRECT_URI="${GMAIL_REDIRECT_URI:-${BASE_CHECKOUT_URL}/oauth/callback}"
 
+node /opt/render/patch-health.mjs
+
 node apps/payment-api/src/index.js &
 ready=0
 for _ in $(seq 1 40); do
