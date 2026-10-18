@@ -48,7 +48,6 @@ async def _seed_demo() -> None:
         log.exception("demo seed failed")
         return
     log.info("demo catalogue seeded")
-    log.error("demo catalogue was not seeded")
 
 
 @asynccontextmanager
