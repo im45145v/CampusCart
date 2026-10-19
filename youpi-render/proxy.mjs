@@ -5,11 +5,29 @@ const port = Number(process.env.PORT || 10000)
 const checkoutPort = Number(process.env.CHECKOUT_PORTAL_PORT || 7000)
 const gmailPort = Number(process.env.GMAIL_OBSERVER_PORT || 6003)
 const smsPort = Number(process.env.SMS_OBSERVER_PORT || 6002)
+const adminPort = Number(process.env.MERCHANT_ADMIN_PORT || 6001)
 const blocked = [/\/confirm-cod\/?$/, /\/simulate-observation\/?$/]
+const adminPaths = new Set([
+  '/admin',
+  '/admin/',
+  '/dashboard',
+  '/dashboard/',
+  '/merchant',
+  '/merchant/',
+  '/merchant-admin',
+  '/merchant-admin/',
+])
 
 function targetPort(path) {
   if (path === '/oauth' || path.startsWith('/oauth/')) return gmailPort
+  if (adminPaths.has(path) || path === '/youpi-sms-gateway.apk') return adminPort
   return checkoutPort
+}
+
+function upstreamUrl(path, rawUrl) {
+  if (!adminPaths.has(path)) return rawUrl
+  const query = rawUrl.includes('?') ? rawUrl.slice(rawUrl.indexOf('?')) : ''
+  return `/admin${query}`
 }
 
 async function observerHealth(_req, res) {
@@ -97,7 +115,7 @@ const server = http.createServer((req, res) => {
   const target = targetPort(path)
   const headers = { ...req.headers, host: `127.0.0.1:${target}` }
   const upstream = http.request(
-    { hostname: '127.0.0.1', port: target, path: req.url, method: req.method, headers },
+    { hostname: '127.0.0.1', port: target, path: upstreamUrl(path, req.url || '/'), method: req.method, headers },
     (response) => {
       res.writeHead(response.statusCode || 502, response.headers)
       response.pipe(res)

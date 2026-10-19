@@ -17,6 +17,7 @@ export YOUPI_MODE=production
 export YOUPI_BIND_HOST=127.0.0.1
 export GMAIL_OBSERVER_PORT="${GMAIL_OBSERVER_PORT:-6003}"
 export SMS_OBSERVER_PORT="${SMS_OBSERVER_PORT:-6002}"
+export MERCHANT_ADMIN_PORT="${MERCHANT_ADMIN_PORT:-6001}"
 export GMAIL_REDIRECT_URI="${GMAIL_REDIRECT_URI:-${BASE_CHECKOUT_URL}/oauth/callback}"
 
 secret_dir=/opt/youpi/data/.secrets
@@ -66,6 +67,9 @@ wait_observer() {
 
 wait_observer "$GMAIL_OBSERVER_PORT" "Gmail observer"
 wait_observer "$SMS_OBSERVER_PORT" "SMS observer"
+
+node apps/merchant-admin/src/index.js &
+wait_observer "$MERCHANT_ADMIN_PORT" "Merchant dashboard"
 
 node apps/checkout-portal/src/index.js &
 exec node /opt/render/proxy.mjs

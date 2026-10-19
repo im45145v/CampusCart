@@ -28,6 +28,7 @@ This is the data layer behind the app. Atlas Vector Search is not wired up.
    - `YOUPI_API_URL` — YouPI payment API origin, no trailing slash, for example `https://pay.yourdomain.com` or the host serving port 6100.
    - `YOUPI_MERCHANT_ID` — the merchant id from the YouPI admin panel.
    - `YOUPI_WEBHOOK_SECRET` — the same value as `COIN_STORE_WEBHOOK_SECRET` on the `campuscart-youpi` service. YouPI signs callbacks with it, and UniCart sends it back as `X-Merchant-Key` when re-reading a payment. The YouPI service sends those callbacks to `https://<api>/api/payments/youpi`.
+   - On `campuscart-youpi`, set `ADMIN_API_TOKEN` to a long password you choose. The merchant portal is `https://<youpi-host>/admin` (the same page is also at `/dashboard` and `/merchant`). The portal asks for that token. Do not commit it.
    - `ADMIN_UPI_ID` — unused for new top-ups. Left so an older environment still boots.
 3. On `campuscart-web`, set `VITE_API_URL` to the API origin, for example `https://campuscart-api.onrender.com`, with no trailing slash. Rebuild the static site after changing it. The browser derives the chat socket from that URL.
 4. Confirm `GET https://<api>/api/health` returns ok.
