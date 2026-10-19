@@ -250,6 +250,79 @@ async def test_youpi_checkout_respects_the_daily_cap(
     assert (await client.get("/api/me/wallet", headers=buyer.headers)).json()["balance_minor"] == 0
 
 
+async def test_short_wallet_pays_that_order_with_upi(
+    client: httpx.AsyncClient, seller: Actor, buyer: Actor, store: dict[str, Any],
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    product = await make_product(client, seller, store, price_minor=1000, stock=5)
+    await client.patch(
+        f"/api/stores/{store['id']}", headers=seller.headers,
+        json={"order_settings": {"payment_options": ["campus_wallet"]}},
+    )
+    body = {
+        "store_id": store["id"], "payment_method": "campus_wallet",
+        "items": [{"product_id": product["id"], "quantity": 1}],
+    }
+    blocked = await client.post("/api/orders", headers=buyer.headers, json=body)
+    assert blocked.status_code == 409
+    _enable_youpi(monkeypatch)
+
+    async def fake_create(order_id: str, amount_minor: int, return_url: str) -> dict[str, str]:
+        assert amount_minor == 1000
+        assert return_url.endswith(f"/orders/{order_id}")
+        return {"paymentId": f"pay-{order_id}", "checkoutUrl": f"http://youpi.test/checkout/{order_id}"}
+
+    async def fake_fetch(payment_id: str) -> dict[str, Any]:
+        order_id = payment_id.removeprefix("pay-")
+        return {
+            "paymentId": payment_id, "orderId": order_id, "status": "SUCCESS", "method": "UPI",
+            "amountPaise": 1000, "verificationLevel": 1, "verificationTag": "Single Verification",
+            "verificationSources": ["Gmail"],
+        }
+
+    monkeypatch.setattr(youpi, "create_payment", fake_create)
+    monkeypatch.setattr(youpi, "fetch_payment", fake_fetch)
+    opened = await client.post("/api/orders", headers=buyer.headers, json=body)
+    assert opened.status_code == 201, opened.text
+    order = opened.json()
+    assert order["payment_status"] == "awaiting_upi"
+    assert order["checkout_url"] == f"http://youpi.test/checkout/{order['id']}"
+    assert order["total_minor"] == 1000
+    assert (await client.get("/api/me/wallet", headers=buyer.headers)).json()["balance_minor"] == 0
+    waiting = (await client.get("/api/seller/orders", headers=seller.headers)).json()
+    assert order["id"] not in {row["id"] for row in waiting}
+    early = await client.post(
+        f"/api/orders/{order['id']}/status", headers=seller.headers, json={"status": "accepted"},
+    )
+    assert early.status_code == 409
+    payload = {
+        "event": "SUCCESS", "paymentId": f"pay-{order['id']}", "orderId": order["id"],
+        "amountPaise": 1000, "method": "UPI",
+    }
+    raw = json.dumps(payload).encode()
+    confirmed = await client.post(
+        "/api/payments/youpi", content=raw, headers={"X-Gateway-Signature": _sign(raw)},
+    )
+    assert confirmed.status_code == 200, confirmed.text
+    assert confirmed.json()["order_paid"] is True
+    assert confirmed.json()["credited"] is False
+    assert (await client.get("/api/me/wallet", headers=buyer.headers)).json()["balance_minor"] == 0
+    paid = (await client.get(f"/api/orders/{order['id']}", headers=buyer.headers)).json()
+    assert paid["payment_status"] == "wallet_paid"
+    visible = (await client.get("/api/seller/orders", headers=seller.headers)).json()
+    assert order["id"] in {row["id"] for row in visible}
+    again = await client.post(
+        "/api/payments/youpi", content=raw, headers={"X-Gateway-Signature": _sign(raw)},
+    )
+    assert again.json()["order_paid"] is True
+    assert (await client.get("/api/me/wallet", headers=buyer.headers)).json()["balance_minor"] == 0
+    cancelled = await client.post(
+        f"/api/orders/{order['id']}/status", headers=buyer.headers, json={"status": "cancelled"},
+    )
+    assert cancelled.status_code == 200, cancelled.text
+    assert (await client.get("/api/me/wallet", headers=buyer.headers)).json()["balance_minor"] == 1000
+
+
 async def test_admin_reverses_a_topup(
     client: httpx.AsyncClient, buyer: Actor, database: Any
 ) -> None:

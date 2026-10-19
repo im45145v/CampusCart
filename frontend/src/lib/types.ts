@@ -75,6 +75,7 @@ export interface Order {
   discount_minor?: number; subscription_id?: string | null
   voucher_code?: string | null; voucher_title?: string | null; voucher_discount_minor?: number
   fulfillment: string; payment_method: string; payment_status: string; note: string
+  checkout_url?: string | null
   request_details: string; status: OrderStatus; created_at: string
   pickup_slot?: { date: string; label: string } | null
   answers?: { id: string; label: string; value: string }[]

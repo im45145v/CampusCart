@@ -1,4 +1,4 @@
-import { useCallback, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import { ReviewCard, ReviewForm } from '@/components/Reviews'
 import { MessageButton, ReportButton } from '@/components/ContactButtons'
@@ -24,6 +24,7 @@ const PAY_STATUS: Record<string, string> = {
   unpaid: 'not yet confirmed by the seller',
   confirmed_by_seller: 'confirmed by the seller',
   wallet_paid: 'paid from the campus wallet',
+  awaiting_upi: 'waiting for this order’s UPI payment',
 }
 
 export const statusLabel = (s: string) => s.replace('_', ' ')
@@ -179,6 +180,11 @@ export function OrderDetail() {
   const { data, loading, error, reload, setData } = useFetch<Order>(`/api/orders/${id}`)
   const apply = useCallback((order: Order) => { if (order.id === id) setData(order) }, [id, setData])
   const live = useLiveOrders(apply)
+  useEffect(() => {
+    if (data?.payment_status !== 'awaiting_upi') return
+    const timer = window.setInterval(() => { void reload() }, 4000)
+    return () => window.clearInterval(timer)
+  }, [data?.payment_status, reload])
   if (loading) return <Loading />
   if (error || !data) return <ErrorState message={error ?? 'Order not found'} onRetry={reload} />
   const role = data.buyer_id === user?.id ? 'buyer' : 'seller'
@@ -209,6 +215,9 @@ export function OrderDetail() {
         {!!data.voucher_discount_minor && <p className="text-right text-sm text-forest">Code {data.voucher_code} −{formatMoney(data.voucher_discount_minor)}</p>}
         <p className="text-right text-lg font-bold">{data.total_minor ? formatMoney(data.total_minor) : `Awaiting quote (estimate ${formatMoney(data.estimated_minor)})`}</p>
         <p className="text-sm text-taupe">{data.fulfillment === 'pickup' ? 'Pickup' : 'Campus meetup'} · {PAYMENT[data.payment_method] ?? data.payment_method} · Payment {PAY_STATUS[data.payment_status] ?? data.payment_status}</p>
+        {role === 'buyer' && data.payment_status === 'awaiting_upi' && data.checkout_url && (
+          <Button asChild><a href={data.checkout_url} target="_blank" rel="noreferrer">Open UPI payment</a></Button>
+        )}
         {live === 'online' && <p className="text-xs text-forest">Live updates are on.</p>}
         {role === 'seller' && <p className="text-sm">Buyer: {data.buyer_name}</p>}
         {data.pickup_slot && <p className="text-sm font-semibold text-forest">Pickup slot: {slotText(data.pickup_slot)}</p>}

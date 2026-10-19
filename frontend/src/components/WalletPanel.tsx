@@ -7,6 +7,7 @@ import { Card } from '@/components/ui/card'
 import { Field, Input, Textarea } from '@/components/ui/input'
 import { api } from '@/lib/api'
 import { useAuth } from '@/lib/auth'
+import { openPaymentPage } from '@/lib/payment'
 import { formatMoney, formatTime, rupeesToMinor } from '@/lib/utils'
 import { useFetch } from '@/lib/useFetch'
 import type { Wallet, WalletCheckout, WalletEntry } from '@/lib/types'
@@ -16,23 +17,6 @@ const REASON: Record<string, string> = {
   order_refund: 'Order refund', order_earning: 'Sale earnings', subscription: 'Plan started',
   subscription_renew: 'Plan renewed', subscription_refund: 'Plan refund', reversal: 'Top-up reversed',
   withdrawal_return: 'Payout returned',
-}
-
-function openCheckout(url: string, popup: Window | null): boolean {
-  let parsed: URL
-  try {
-    parsed = new URL(url)
-  } catch {
-    return false
-  }
-  if (parsed.protocol !== 'https:' && parsed.protocol !== 'http:') return false
-  if (popup && !popup.closed) {
-    popup.location.replace(parsed.href)
-    popup.opener = null
-    return true
-  }
-  window.location.assign(parsed.href)
-  return true
 }
 
 const STATUS: Record<string, string> = {
@@ -92,7 +76,7 @@ function MoneyForm({
         })
         const url = entry.checkout_url ?? null
         setCheckoutUrl(url)
-        if (!url || !openCheckout(url, popup)) {
+        if (!url || !openPaymentPage(url, popup)) {
           popup?.close()
           const text = 'YouPI did not return a checkout link.'
           setMsg({ tone: 'bad', text })

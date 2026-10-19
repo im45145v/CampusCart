@@ -192,7 +192,8 @@ async def apply_youpi_callback(db: Database, payload: dict[str, Any]) -> tuple[i
     method = str(payload.get("method") or "").upper()
     entry = await db.wallet_ledger.find_one({"_id": order_id, "reason": "topup", "method": "youpi"})
     if not entry or entry.get("youpi_payment_id") != payment_id:
-        return 200, {"credited": False}
+        from .orders import mark_youpi_order_paid
+        return await mark_youpi_order_paid(db, payload)
     if entry.get("status") == "posted" and entry.get("balance_applied"):
         return 200, {"credited": True}
     if event in {"FAILED", "EXPIRED", "CANCELLED"} and entry.get("status") == "requested":
