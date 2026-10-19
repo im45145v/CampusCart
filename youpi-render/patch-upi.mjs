@@ -11,4 +11,8 @@ const table = db.prepare("SELECT name FROM sqlite_master WHERE type = 'table' AN
 if (!table) process.exit(1)
 const result = db.prepare('UPDATE payment_receiving_accounts SET upi_id = ?, payee_name = ?').run(upi, name)
 if (result.changes < 1) process.exit(1)
+const merchants = db.prepare("SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'merchants'").get()
+if (merchants) {
+  db.prepare('UPDATE merchants SET business_name = ?').run(name)
+}
 console.log('receiving UPI set')
