@@ -5,10 +5,11 @@ from typing import Any
 
 from fastapi import HTTPException
 
+from ..config import get_settings
 from ..db import Database
 from ..schemas import AddonPick, OrderIn, OrderSettings
 from ..util import new_id, now
-from . import notifications, printing, subscriptions, vouchers, wallet
+from . import notifications, printing, subscriptions, vouchers, wallet, youpi
 from .live import push_order
 
 TERMINAL = {"completed", "rejected", "cancelled"}
@@ -445,19 +446,29 @@ async def create_order(db: Database, buyer: dict[str, Any], body: OrderIn) -> di
     }
     charged_amount = 0
     held = False
+    pay_by_upi = False
     try:
         if offer:
             await vouchers.hold(
                 db, offer["voucher"], buyer["_id"], order["_id"], store["_id"], voucher_discount,
             )
             held = True
-        if body.payment_method == "campus_wallet" and not needs_quote:
-            if payable > 0:
+        if body.payment_method == "campus_wallet" and not needs_quote and payable > 0:
+            balance = await wallet.balance_of(db, buyer["_id"])
+            if balance < payable:
+                if not youpi.configured():
+                    raise HTTPException(409, "Not enough campus wallet balance")
+                pay_by_upi = True
+                order["payment_status"] = "awaiting_upi"
+            else:
                 await wallet.debit(
                     db, buyer["_id"], payable, "order_payment",
                     note=store["name"], related_id=order["_id"],
                 )
                 charged_amount = payable
+                order["wallet_charged_minor"] = payable
+                order["payment_status"] = "wallet_paid"
+        elif body.payment_method == "campus_wallet" and not needs_quote:
             order["wallet_charged_minor"] = payable
             order["payment_status"] = "wallet_paid"
         await db.orders.insert_one(order)
@@ -478,18 +489,105 @@ async def create_order(db: Database, buyer: dict[str, Any], body: OrderIn) -> di
                 note=store["name"], related_id=order["_id"],
             )
         raise
+    if pay_by_upi:
+        return_url = get_settings().public_web_url.rstrip("/") + f"/orders/{order['_id']}"
+        try:
+            created = await youpi.create_payment(order["_id"], payable, return_url)
+        except youpi.YoupiError as err:
+            await release_stock(db, order)
+            if held:
+                await vouchers.release(db, order["_id"])
+            await db.orders.delete_one({"_id": order["_id"]})
+            raise HTTPException(err.status, err.detail) from err
+        await db.orders.update_one(
+            {"_id": order["_id"]},
+            {"$set": {
+                "youpi_payment_id": created["paymentId"],
+                "checkout_url": created["checkoutUrl"],
+            }},
+        )
+        order["youpi_payment_id"] = created["paymentId"]
+        order["checkout_url"] = created["checkoutUrl"]
+        await push_order(order)
+        return order
     await push_order(order)
-    title, message, href = _seller_alert(order, buyer["name"], store["name"])
-    await notifications.notify(
-        db, store["owner_id"], "order", title, message, href, order["_id"],
-    )
+    await _notify_seller(db, order, buyer["name"], store["name"])
     return order
+
+
+async def _notify_seller(db: Database, order: dict[str, Any], buyer_name: str, store_name: str) -> None:
+    title, message, href = _seller_alert(order, buyer_name, store_name)
+    await notifications.notify(
+        db, order["seller_id"], "order", title, message, href, order["_id"],
+    )
+
+
+async def mark_youpi_order_paid(db: Database, payload: dict[str, Any]) -> tuple[int, dict[str, Any]]:
+    """Mark one awaiting order paid when YouPI's own record confirms that UPI payment.
+
+    The buyer's spendable balance does not change. The money is for this order.
+    A later cancel returns it as campus credits.
+    """
+    order_id = str(payload.get("orderId") or "")
+    payment_id = str(payload.get("paymentId") or "")
+    event = str(payload.get("event") or "").upper()
+    method = str(payload.get("method") or "").upper()
+    order = await db.orders.find_one({"_id": order_id})
+    if not order or order.get("youpi_payment_id") != payment_id:
+        return 200, {"credited": False}
+    if order.get("payment_status") == "wallet_paid":
+        return 200, {"credited": False, "order_paid": True}
+    if order.get("payment_status") != "awaiting_upi":
+        return 200, {"credited": False}
+    if event in {"FAILED", "EXPIRED", "CANCELLED"}:
+        return 200, {"credited": False}
+    raw_paise = payload.get("amountPaise")
+    if isinstance(raw_paise, bool) or not isinstance(raw_paise, (int, str)):
+        return 200, {"credited": False}
+    try:
+        webhook_paise = int(raw_paise)
+    except ValueError:
+        return 200, {"credited": False}
+    amount = int(order.get("total_minor") or 0)
+    if event != "SUCCESS" or method != "UPI" or webhook_paise != amount or amount <= 0:
+        return 200, {"credited": False}
+    try:
+        remote = await youpi.fetch_payment(payment_id)
+    except youpi.YoupiError:
+        return 503, {"detail": "YouPI payment could not be re-read"}
+    if not youpi.is_verified_upi(remote, order_id, amount, payment_id):
+        return 200, {"credited": False}
+    won = await db.orders.find_one_and_update(
+        {"_id": order_id, "payment_status": "awaiting_upi", "youpi_payment_id": payment_id},
+        {"$set": {
+            "payment_status": "wallet_paid",
+            "wallet_charged_minor": amount,
+            "updated_at": now(),
+        }},
+    )
+    if won is None:
+        current = await db.orders.find_one({"_id": order_id})
+        if current and current.get("payment_status") == "wallet_paid":
+            return 200, {"credited": False, "order_paid": True}
+        return 200, {"credited": False}
+    paid = await db.orders.find_one({"_id": order_id})
+    assert paid is not None
+    await push_order(paid)
+    await _notify_seller(db, paid, str(paid.get("buyer_name") or ""), str(paid.get("store_name") or ""))
+    await notifications.notify(
+        db, paid["buyer_id"], "order", "Payment confirmed",
+        f"YouPI confirmed the UPI payment for {paid.get('store_name', 'your order')}.",
+        f"/orders/{order_id}", order_id,
+    )
+    return 200, {"credited": False, "order_paid": True}
 
 
 async def change_status(
     db: Database, order: dict[str, Any], actor: dict[str, Any], role: str, target: str, reason: str
 ) -> dict[str, Any]:
     current = order["status"]
+    if order.get("payment_status") == "awaiting_upi" and target not in {"cancelled", "rejected"}:
+        raise HTTPException(409, "This order is waiting for the UPI payment")
     check_transition(role, current, target)
     charged_now = 0
     if (

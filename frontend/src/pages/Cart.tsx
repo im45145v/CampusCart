@@ -9,11 +9,12 @@ import { Field, Input, Select, Textarea } from '@/components/ui/input'
 import { api } from '@/lib/api'
 import { useAuth } from '@/lib/auth'
 import { borrowUnits, groupByStore, lineEstimate, lineKey, type CartLine } from '@/lib/cart'
+import { openPaymentPage } from '@/lib/payment'
 import { useCart } from '@/lib/cartContext'
 import { themeStyle } from '@/lib/theme'
 import { cn, formatMoney, paysUpfront } from '@/lib/utils'
 import { useFetch } from '@/lib/useFetch'
-import type { Order, OrderOptions, Store, VoucherQuote } from '@/lib/types'
+import type { Order, OrderOptions, Store, VoucherQuote, Wallet } from '@/lib/types'
 
 const FULFILMENT_LABEL = { pickup: 'Pickup at the store', campus_meetup: 'Campus meetup' }
 const PAYMENT_LABEL = {
@@ -60,6 +61,7 @@ function StoreCheckout({ storeId, lines }: { storeId: string; lines: CartLine[] 
   const nav = useNavigate()
   const store = useFetch<Store>(`/api/stores/${storeId}`)
   const options = useFetch<OrderOptions>(`/api/stores/${storeId}/order-options`)
+  const wallet = useFetch<Wallet>(user ? '/api/me/wallet' : null)
   const [fulfillmentPick, setFulfillment] = useState('')
   const [paymentPick, setPayment] = useState('')
   const [slot, setSlot] = useState('')
@@ -94,6 +96,9 @@ function StoreCheckout({ storeId, lines }: { storeId: string; lines: CartLine[] 
   })
   const rateError = charges.find((c) => c.error)?.error ?? ''
   const estimate = lines.reduce((sum, l, i) => sum + lineEstimate(l, l.rateUnit ? charges[i].units : 1), 0)
+  const payable = offer?.payable_minor ?? estimate
+  const balance = wallet.data?.balance_minor ?? user?.wallet_balance_minor ?? 0
+  const payThisOrder = payment === 'campus_wallet' && payable > balance && wallet.data?.checkout === 'ready'
   const itemBody = lines.map((l) => ({
     product_id: l.productId, variant_id: l.variantId, quantity: l.quantity,
     addons: (l.addons ?? []).map((a) => ({ id: a.id, quantity: a.quantity })),
@@ -127,6 +132,7 @@ function StoreCheckout({ storeId, lines }: { storeId: string; lines: CartLine[] 
     if (!user) return nav('/login', { state: { from: '/cart' } })
     setBusy(true)
     setError('')
+    const popup = payThisOrder ? window.open('', '_blank') : null
     try {
       const [date, label] = slot.split('|')
       const order = await api<Order>('/api/orders', {
@@ -142,8 +148,16 @@ function StoreCheckout({ storeId, lines }: { storeId: string; lines: CartLine[] 
         },
       })
       cart.removeStore(storeId)
+      if (order.checkout_url) {
+        const opened = openPaymentPage(order.checkout_url, popup)
+        if (!opened) popup?.close()
+        if (popup && !popup.closed) nav(`/orders/${order.id}`)
+        return
+      }
+      popup?.close()
       nav(`/orders/${order.id}`)
     } catch (e) {
+      popup?.close()
       const message = e instanceof Error ? e.message : 'Could not place order'
       setError(message)
       toast('bad', message)
@@ -186,7 +200,7 @@ function StoreCheckout({ storeId, lines }: { storeId: string; lines: CartLine[] 
           <div className="grid gap-3 sm:grid-cols-2">
             <Field label="Fulfilment"><Select value={fulfillment} onChange={(e) => setFulfillment(e.target.value)}>{opts.fulfillment_options.map((o) => <option key={o} value={o}>{FULFILMENT_LABEL[o]}</option>)}</Select></Field>
             {paysUpfront(opts.payment_options) ? (
-              <p className="text-sm sm:col-span-2">Pay upfront with campus credits. This stall does not take cash when you collect. The credits leave your balance when you place the order, and come back if the order is cancelled or rejected.</p>
+              <p className="text-sm sm:col-span-2">Pay upfront with campus credits. This stall does not take cash when you collect. The credits leave your balance when you place the order, and come back if the order is cancelled or rejected. If the wallet does not cover this order, you pay that amount with UPI instead. It is only for this order.</p>
             ) : (
               <Field label="Payment" hint="Campus credits, or cash the seller confirms. This is not a bank payment.">
                 <Select value={payment} onChange={(e) => setPayment(e.target.value)}>{opts.payment_options.map((o) => <option key={o} value={o}>{PAYMENT_LABEL[o]}</option>)}</Select>
@@ -230,8 +244,8 @@ function StoreCheckout({ storeId, lines }: { storeId: string; lines: CartLine[] 
       <Field label="Note to seller (optional)"><Input value={note} maxLength={1000} onChange={(e) => setNote(e.target.value)} /></Field>
       {lines.some((l) => l.printJob) && <Field label="Note for the print desk (optional)"><Textarea value={details} maxLength={3000} onChange={(e) => setDetails(e.target.value)} /></Field>}
       <div className="flex flex-wrap items-center justify-between gap-2">
-        <p>Total <strong>{formatMoney(offer?.payable_minor ?? estimate)}</strong></p>
-        <Button size="lg" disabled={busy || !opts || slotMissing || missing.length > 0 || returnMissing || timeMissing || !!rateError} onClick={place}>{busy ? 'Placing…' : 'Place order'}</Button>
+        <p>Total <strong>{formatMoney(payable)}</strong></p>
+        <Button size="lg" disabled={busy || !opts || slotMissing || missing.length > 0 || returnMissing || timeMissing || !!rateError} onClick={place}>{busy ? 'Placing…' : payThisOrder ? 'Pay this order with UPI' : 'Place order'}</Button>
       </div>
       {slotMissing && <p className="text-sm text-warn">Choose a pickup time to continue.</p>}
       {returnMissing && <p className="text-sm text-warn">Choose the day you will bring it back.</p>}
@@ -239,6 +253,7 @@ function StoreCheckout({ storeId, lines }: { storeId: string; lines: CartLine[] 
       {rateError && <p className="text-sm text-warn">{rateError}</p>}
       {missing.length > 0 && <p className="text-sm text-warn">Please answer: {missing.map((m) => m.label).join(', ')}</p>}
       {options.error && <Notice tone="bad">{options.error}</Notice>}
+      {payThisOrder && <p className="text-sm text-taupe">Campus credits ({formatMoney(balance)}) do not cover this order. UPI pays {formatMoney(payable)} for this order only. It is not added to your wallet.</p>}
       {error && <Notice tone="bad">{error}</Notice>}
     </Card>
     </div>

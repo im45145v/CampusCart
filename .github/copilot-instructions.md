@@ -1,7 +1,7 @@
-# CampusCart Copilot Instructions
+# UniCart Copilot Instructions
 
 ## Project snapshot
-- CampusCart is a campus marketplace with three active surfaces: `backend/` (Python 3.12 FastAPI), `frontend/` (React + TypeScript + Vite + Tailwind), and `edge/uno_q/` (Python edge assistant service).
+- UniCart is a campus marketplace with three active surfaces: `backend/` (Python 3.12 FastAPI), `frontend/` (React + TypeScript + Vite + Tailwind), and `edge/uno_q/` (Python edge assistant service).
 - Backend package code lives in `backend/app/`; frontend source lives in `frontend/src/`; project docs live in `docs/`; CI is `.github/workflows/ci.yml`; deployment is defined in `render.yaml`.
 
 ## Repo layout
@@ -30,7 +30,7 @@
 - Karma is a reputation concept and must stay separate from money or balances.
 - Order statuses are `placed`, `quote_requested`, `quoted`, `accepted`, `preparing`, `ready`, `completed`, `rejected`, `cancelled`; enforce transitions in `backend/app/services/orders.py`.
 - Decrement stock atomically with a conditional update (`$gte`) and restore it at most once on cancel or reject.
-- Payments are whatever that stall enabled: pay-on-pickup, manually confirmed by the seller, or campus-wallet credits. A stall that enables only campus wallet is pay upfront: debit when the price is known, no cash at collection, refund once on cancel or reject until the order is completed. The wallet is an on-campus ledger. A top-up stores the UPI transaction ID the student typed and stays requested until an admin approves it; that ID is not proof of payment, and the spendable balance does not increase before approval. Staff can reverse a posted top-up. Payouts leave the balance when requested and staff mark them paid or return them. Never claim automated UPI or bank verification. Karma stays separate from wallet balances.
+- Payments are whatever that stall enabled: pay-on-pickup, manually confirmed by the seller, or campus-wallet credits. A stall that enables only campus wallet is pay upfront: debit when the price is known, no cash at collection, refund once on cancel or reject until the order is completed. The wallet is an on-campus ledger. A top-up opens a YouPI-PG checkout and stays requested until the server verifies YouPI's signed success callback and re-reads that payment as a verified UPI success. A browser success flag, a typed transaction ID, and an admin approve action do not credit a new top-up. Cash-on-delivery and unverified YouPI callbacks are ignored. Staff can reverse a posted top-up. Payouts leave the balance when requested and staff mark them paid or return them. Do not claim UniCart reads the bank itself. The YouPI merchant portal is `/admin` on the YouPI host (`/dashboard` and `/merchant` open the same page) and asks for `ADMIN_API_TOKEN`. A Gmail refresh token saved with the merchant key is restored into YouPI on boot, so a restart does not require another Google consent. A campus-wallet order whose balance is short opens a YouPI checkout for that order total only (`payment_status` `awaiting_upi`); the wallet balance does not rise, and the seller is told after YouPI confirms it. The static site serves `404.html` as a copy of `index.html` so a refresh of `/account` or `/orders/:id` still loads the app. Karma stays separate from wallet balances.
 - Food extras add minor units on top of the catalogue price. Print jobs with a rate card are priced from the uploaded file; printing without a rate card stays a seller quote. Voucher discounts are computed on the server from the code's rules and released if the order is cancelled or rejected. In-app notifications are stored and pushed on the chat socket.
 - AI listing drafts never publish listings. `POST /api/ai/listing-draft` may only return price or stock when those values exist in the seller's source text; missing fields must remain missing. `POST /api/ai/transcribe` returns transcript text only.
 - Chat uses `POST /api/chat/ws-ticket` plus `/ws/chat?ticket=...`; tickets are single-use and expire after 60 seconds, messages persist before `ack`, sequence numbers are monotonic per conversation, and missed-message recovery uses `after_seq` / `before_seq` semantics.
@@ -43,7 +43,7 @@
 - Preserve rate limiting, audit logging, idempotency, and inventory safety when changing auth, orders, chat, or edge flows.
 
 ## UI and theme
-- Use the CampusCart palette consistently: background `#F7F5EF`, cards `#FFFFFF`, primary teal `#20B8A5`, teal hover `#159786`, navigation and headings midnight `#142B3B`, gold highlight `#FFC857` (small accents only), primary text `#182B36`, secondary text `#64748B`, borders `#E5E5DD`, success `#15803D`, warning `#A16207`, and error `#B91C1C`. White text on teal is about 2.5:1, so teal buttons use midnight text. Gold is only a highlight behind dark text.
+- Use the UniCart palette consistently: cream background `#F6F0E6`, cards `#FFFBF6`, coffee buttons `#6F4E37`, coffee hover `#5C4033`, espresso navigation and headings `#2C1810`, brass highlight `#C6A15B` (small accents only), primary text `#2C2118`, secondary text `#7A6556`, borders `#E7D9C8`, success `#15803D`, warning `#A16207`, and error `#B91C1C`. Buttons use white text on the coffee brown. Brass is only a highlight behind dark text.
 - Use Manrope for headings and Inter for body text. A stall theme may recolor that stall’s own pages; the app shell stays on this palette.
 - Prefer accessible, calm marketplace UI patterns that fit Tailwind plus the shadcn-style component system in `frontend/src/components/ui/`.
 

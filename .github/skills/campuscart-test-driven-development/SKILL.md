@@ -1,11 +1,11 @@
 ---
 name: campuscart-test-driven-development
-description: Guides test-first CampusCart changes. Use when a bug or feature should be reproduced with automated tests before implementation.
+description: Guides test-first UniCart changes. Use when a bug or feature should be reproduced with automated tests before implementation.
 ---
 # campuscart-test-driven-development
 
 Purpose
-- Drive CampusCart changes through failing tests first when behavior is well-defined and regression risk is meaningful.
+- Drive UniCart changes through failing tests first when behavior is well-defined and regression risk is meaningful.
 - Keep tests close to the touched surface and domain invariant.
 
 When to use

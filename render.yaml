@@ -41,8 +41,49 @@ services:
         sync: false
       - key: PUBLIC_WEB_URL
         sync: false
+      - key: YOUPI_API_URL
+        sync: false
+      - key: YOUPI_MERCHANT_ID
+        sync: false
+      - key: YOUPI_WEBHOOK_SECRET
+        sync: false
       - key: ADMIN_UPI_ID
-        value: im45145v@oksbi
+        value: im45145v-2@okhdfcbank
+  - type: web
+    name: campuscart-youpi
+    runtime: docker
+    dockerfilePath: youpi-render/Dockerfile
+    dockerContext: youpi-render
+    region: singapore
+    plan: free
+    healthCheckPath: /health
+    envVars:
+      - key: COIN_STORE_WEBHOOK_URL
+        value: https://campuscart-api-0f09.onrender.com/api/payments/youpi
+      - key: COIN_STORE_WEBHOOK_SECRET
+        sync: false
+      - key: ENCRYPTION_MASTER_KEY
+        sync: false
+      - key: YOUPI_UPI_ID
+        value: im45145v-2@okhdfcbank
+      - key: YOUPI_UPI_NAME
+        value: UniCart
+      - key: GMAIL_OBSERVER_PORT
+        value: "6003"
+      - key: SMS_OBSERVER_PORT
+        value: "6002"
+      - key: GMAIL_REDIRECT_URI
+        value: https://campuscart-youpi.onrender.com/oauth/callback
+      - key: GMAIL_CLIENT_ID
+        sync: false
+      - key: GMAIL_CLIENT_SECRET
+        sync: false
+      - key: ANDROID_ENROLLMENT_SECRET
+        sync: false
+      - key: ADMIN_API_TOKEN
+        sync: false
+      - key: SEED_DEMO
+        sync: false
   - type: web
     name: campuscart-web
     runtime: static

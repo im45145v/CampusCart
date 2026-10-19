@@ -1,11 +1,11 @@
 ---
 name: campuscart-documentation
-description: Guides CampusCart documentation updates. Use when architecture, APIs, workflows, commands, or security assumptions have changed.
+description: Guides UniCart documentation updates. Use when architecture, APIs, workflows, commands, or security assumptions have changed.
 ---
 # campuscart-documentation
 
 Purpose
-- Keep CampusCart documentation aligned with the live architecture, workflows, and constraints.
+- Keep UniCart documentation aligned with the live architecture, workflows, and constraints.
 - Favor concise, repo-specific guidance over generic prose.
 
 When to use

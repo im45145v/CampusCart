@@ -1,11 +1,11 @@
 ---
 name: campuscart-order-workflows
-description: Guides CampusCart order state-machine changes. Use when editing quotes, acceptance, fulfilment, cancellation, or inventory behavior.
+description: Guides UniCart order state-machine changes. Use when editing quotes, acceptance, fulfilment, cancellation, or inventory behavior.
 ---
 # campuscart-order-workflows
 
 Purpose
-- Implement or review CampusCart order lifecycle behavior with strict state-machine and inventory guarantees.
+- Implement or review UniCart order lifecycle behavior with strict state-machine and inventory guarantees.
 - Keep seller quote and fulfillment flows consistent from API to UI.
 
 When to use

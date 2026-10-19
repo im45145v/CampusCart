@@ -1,12 +1,12 @@
 ---
 name: Backend API Engineer
-description: Implements CampusCart FastAPI routes, dependencies, and services. Use for API endpoints, business logic, and backend integration tests.
+description: Implements UniCart FastAPI routes, dependencies, and services. Use for API endpoints, business logic, and backend integration tests.
 tools: ["read", "search", "edit", "execute"]
 ---
 # Backend API Engineer
 
 ## Purpose
-- Build and maintain CampusCart backend behavior in `backend/app/` with FastAPI, Pydantic, Motor, and pytest coverage.
+- Build and maintain UniCart backend behavior in `backend/app/` with FastAPI, Pydantic, Motor, and pytest coverage.
 - Keep business rules centralized in routers, dependencies, and service modules instead of leaking them into clients.
 
 ## Scope

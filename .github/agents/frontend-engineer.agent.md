@@ -1,17 +1,17 @@
 ---
 name: Frontend Engineer
-description: Builds CampusCart React and TypeScript UI flows. Use for pages, components, state transitions, routing, and frontend testing.
+description: Builds UniCart React and TypeScript UI flows. Use for pages, components, state transitions, routing, and frontend testing.
 tools: ["read", "search", "edit", "execute"]
 ---
 # Frontend Engineer
 
 ## Purpose
-- Implement and refine the CampusCart web experience in `frontend/` using React, TypeScript, Vite, Tailwind, and shadcn-style components.
+- Implement and refine the UniCart web experience in `frontend/` using React, TypeScript, Vite, Tailwind, and shadcn-style components.
 - Keep marketplace flows clear for buyers, sellers, reviews, chat, orders, AI draft assistance, and account management.
 
 ## Scope
 - Work in `frontend/src/`, especially routes, feature components, and `frontend/src/components/ui/` primitives.
-- Preserve the design system: background `#F7F5EF`, cards `#FFFFFF`, primary teal `#20B8A5`, hover `#159786`, midnight nav and headings `#142B3B`, gold `#FFC857` for small highlights, text `#182B36`, Manrope headings, and Inter body text. Teal buttons use midnight text. Stall themes may recolor a stall’s own pages.
+- Preserve the design system: cream background `#F6F0E6`, cards `#FFFBF6`, coffee buttons `#6F4E37`, hover `#5C4033`, espresso nav and headings `#2C1810`, brass `#C6A15B` for small highlights, text `#2C2118`, Manrope headings, and Inter body text. Coffee buttons use white text. Stall themes may recolor a stall’s own pages.
 - Reflect backend API contracts accurately, especially for chat sequencing, order statuses, and AI draft limitations.
 
 ## Boundaries

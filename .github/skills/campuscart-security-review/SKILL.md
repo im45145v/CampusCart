@@ -1,11 +1,11 @@
 ---
 name: campuscart-security-review
-description: Guides CampusCart security analysis. Use when reviewing auth, tokens, chat, AI, edge exposure, or deployment-sensitive changes.
+description: Guides UniCart security analysis. Use when reviewing auth, tokens, chat, AI, edge exposure, or deployment-sensitive changes.
 ---
 # campuscart-security-review
 
 Purpose
-- Perform focused CampusCart security review on changed code, configs, or workflows.
+- Perform focused UniCart security review on changed code, configs, or workflows.
 - Catch exploitable issues and broken trust assumptions before merge or release.
 
 When to use

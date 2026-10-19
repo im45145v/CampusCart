@@ -1,14 +1,16 @@
 """Seed the three campus demo stores. Safe to run again: existing emails are reused."""
 import asyncio
+import os
 from typing import Any
 
 import httpx
 
 from app import db
 from app.audit import record
+from app.services.wallet import credit
 from app.util import new_id, now
 
-API = "http://127.0.0.1:8000"
+API = os.environ.get("CAMPUSCART_SEED_API", "http://127.0.0.1:8000")
 BUYER = ("Campus Student", "student.buyer@campus.test", "CampusBuyer1")
 ADMIN = ("Campus Desk", "desk.admin@campus.test", "CampusDesk1")
 
@@ -196,12 +198,26 @@ RETIRED_LENDERS = (
 
 
 async def account(client: httpx.AsyncClient, name: str, email: str, password: str) -> dict[str, str]:
-    r = await client.post("/api/auth/login", json={"email": email, "password": password})
-    if r.status_code == 401:
-        r = await client.post("/api/auth/register", json={"name": name, "email": email, "password": password})
-    r.raise_for_status()
-    body = r.json()
-    return {"token": body["token"], "id": body["user"]["id"]}
+    """Issue a token from the database. Login is rate-limited, and this seed calls it from the API host."""
+    del client
+    from app.security import create_access_token, hash_password
+    from app.util import new_id, now
+
+    database = await db.connect()
+    user = await database.users.find_one({"email": email})
+    if user is None:
+        user = {
+            "_id": new_id(), "name": name, "email": email, "roles": ["buyer"],
+            "is_active": True, "saved_stores": [], "karma_balance": 0,
+            "wallet_balance_minor": 0, "created_at": now(),
+            "password_hash": hash_password(password),
+        }
+        await database.users.insert_one(user)
+    elif not user.get("password_hash"):
+        await database.users.update_one(
+            {"_id": user["_id"]}, {"$set": {"password_hash": hash_password(password), "name": name}},
+        )
+    return {"token": create_access_token(str(user["_id"])), "id": str(user["_id"])}
 
 
 ADDONS = {
@@ -353,32 +369,16 @@ async def seed() -> None:
                 published.raise_for_status()
                 print(f"  listed {raw['title']}")
         loaded = await database.wallet_ledger.find_one(
-            {"user_id": buyer["id"], "note": "demo desk load", "reason": "topup"},
+            {"user_id": buyer["id"], "note": "demo desk load", "reason": "topup", "status": "posted"},
         )
-        if loaded and loaded.get("status") == "posted":
+        if loaded:
             print("wallet already loaded")
         else:
-            await database.users.update_one(
-                {"_id": admin["id"]}, {"$addToSet": {"roles": "admin"}},
+            await database.wallet_ledger.update_many(
+                {"user_id": buyer["id"], "note": "demo desk load", "reason": "topup", "status": "requested"},
+                {"$set": {"status": "expired"}, "$unset": {"transaction_key": ""}},
             )
-            if loaded and loaded.get("status") == "requested":
-                entry_id = loaded["_id"]
-            else:
-                topup = await client.post(
-                    "/api/me/wallet/add",
-                    headers={"Authorization": "Bearer " + buyer["token"]},
-                    json={
-                        "amount_minor": 50000, "method": "upi", "note": "demo desk load",
-                        "transaction_id": "demo-desk-load",
-                    },
-                )
-                topup.raise_for_status()
-                entry_id = topup.json()["id"]
-            approved = await client.post(
-                f"/api/admin/wallet/{entry_id}/approve",
-                headers={"Authorization": "Bearer " + admin["token"]},
-            )
-            approved.raise_for_status()
+            await credit(database, buyer["id"], 50000, "topup", note="demo desk load", method="youpi")
             print("wallet loaded")
 
     user = await database.users.find_one({"email": ADMIN[1]})

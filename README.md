@@ -1,4 +1,4 @@
-# CampusCart
+# UniCart
 
 Open-source campus marketplace: discover student-run stores, order products and services, chat with sellers in real time, and run your own store.
 
@@ -8,7 +8,7 @@ Open-source campus marketplace: discover student-run stores, order products and 
 - `docs/`: [guide](docs/guide.md), [architecture](docs/architecture.md), [API](docs/api.md), [security](docs/security.md), [setup](docs/setup.md), [Copilot workflows](docs/copilot-workflows.md)
 - `.github/`: Copilot instructions, custom agents and skills for AI-assisted development
 
-Quick start: see [docs/setup.md](docs/setup.md). Deploy checklist: [docs/deploy.md](docs/deploy.md). Submission draft: [docs/submission.md](docs/submission.md). A stall chooses pay on pickup, pay the seller directly, or campus-wallet credits. A stall that keeps only campus wallet is listed as pay upfront: the credits are taken when the price is known, and cash at collection is not offered. CampusCart does not verify bank or UPI payments. A wallet top-up stays pending until an admin confirms the transaction ID the student typed. Cancel or reject returns those credits once. A completed order leaves them with the seller.
+Quick start: see [docs/setup.md](docs/setup.md). Deploy checklist: [docs/deploy.md](docs/deploy.md). Submission draft: [docs/submission.md](docs/submission.md). A stall chooses pay on pickup, pay the seller directly, or campus-wallet credits. A stall that keeps only campus wallet is listed as pay upfront: the credits are taken when the price is known, and cash at collection is not offered. A wallet top-up stays pending until UniCart verifies YouPI’s signed UPI confirmation. UniCart does not read the bank itself. Cancel or reject returns those credits once. A completed order leaves them with the seller.
 
 ## Judge path
 

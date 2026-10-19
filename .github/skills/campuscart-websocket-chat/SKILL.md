@@ -1,11 +1,11 @@
 ---
 name: campuscart-websocket-chat
-description: Guides CampusCart real-time chat changes. Use when touching WebSocket tickets, sequencing, persistence, reconnect, or chat UI contracts.
+description: Guides UniCart real-time chat changes. Use when touching WebSocket tickets, sequencing, persistence, reconnect, or chat UI contracts.
 ---
 # campuscart-websocket-chat
 
 Purpose
-- Maintain CampusCart real-time chat behavior without weakening delivery, auth, or recovery guarantees.
+- Maintain UniCart real-time chat behavior without weakening delivery, auth, or recovery guarantees.
 - Keep WebSocket, persistence, and REST recovery endpoints consistent.
 
 When to use

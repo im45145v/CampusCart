@@ -1,11 +1,11 @@
 ---
 name: campuscart-mongodb-modeling
-description: Guides MongoDB schema and index decisions for CampusCart. Use when changing persistence, queries, money fields, or inventory rules.
+description: Guides MongoDB schema and index decisions for UniCart. Use when changing persistence, queries, money fields, or inventory rules.
 ---
 # campuscart-mongodb-modeling
 
 Purpose
-- Design and review MongoDB persistence for CampusCart without breaking inventory, money, or lookup invariants.
+- Design and review MongoDB persistence for UniCart without breaking inventory, money, or lookup invariants.
 - Keep schema and index choices aligned with backend behavior.
 
 When to use

@@ -1,6 +1,6 @@
 ---
 name: Edge IoT Engineer
-description: Owns CampusCart edge and UNO Q integrations. Use for seller assistant tools, scoped token flows, Telegram hooks, and MCP-facing edge behavior.
+description: Owns UniCart edge and UNO Q integrations. Use for seller assistant tools, scoped token flows, Telegram hooks, and MCP-facing edge behavior.
 tools: ["read", "search", "edit", "execute"]
 ---
 # Edge IoT Engineer

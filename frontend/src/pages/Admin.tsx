@@ -185,11 +185,11 @@ function Funds() {
           ))}
         </ul>
       ) : <p className="text-sm text-taupe">No payouts waiting.</p>}
-      <h2 className="pt-2 text-lg font-bold">Top-ups waiting</h2>
-      <p className="text-sm text-taupe">Status: requested. The transaction ID is what the student typed. It does not prove the UPI payment arrived. Approve only after you see the money, and only then does the spendable balance increase. Decline leaves the balance unchanged.</p>
-      {waiting.data?.length ? (
+      <h2 className="pt-2 text-lg font-bold">Older desk top-ups</h2>
+      <p className="text-sm text-taupe">New top-ups are confirmed by YouPI. This list is only a desk request that was still waiting. Approving a YouPI checkout does nothing.</p>
+      {waiting.data?.filter((e) => e.method !== 'youpi').length ? (
         <ul className="space-y-2">
-          {waiting.data.map((e) => (
+          {waiting.data.filter((e) => e.method !== 'youpi').map((e) => (
             <li key={e.id}>
               <Card className="flex flex-wrap items-center justify-between gap-3">
                 <div>
@@ -206,7 +206,7 @@ function Funds() {
         </ul>
       ) : <p className="text-sm text-taupe">No top-ups waiting.</p>}
       <h2 className="pt-2 text-lg font-bold">Confirmed top-ups</h2>
-      <p className="text-sm text-taupe">Status: in the spendable balance. Reverse one only if the desk did not take the money. The balance is debited, and it fails if those credits were already spent.</p>
+      <p className="text-sm text-taupe">Status: in the spendable balance. Reverse one only if that top-up should not have been credited. The balance is debited, and it fails if those credits were already spent.</p>
       {posted.data?.length ? (
         <ul className="space-y-2">
           {posted.data.map((e) => (

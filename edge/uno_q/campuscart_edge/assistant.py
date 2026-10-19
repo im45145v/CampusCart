@@ -27,7 +27,7 @@ async def answer(client: CampusCartClient, tools: dict[str, Tool], text: str) ->
     except ToolError as e:
         return f"Sorry: {e}"
     except Exception:  # noqa: BLE001 - network/API failure must not crash the bot
-        return "CampusCart is unreachable right now. Try again shortly."
+        return "UniCart is unreachable right now. Try again shortly."
     return HELP
 
 

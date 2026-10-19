@@ -1,12 +1,12 @@
 ---
 name: Code Reviewer
-description: Performs high-signal CampusCart diff review. Use for pre-merge checks focused on bugs, broken invariants, security issues, and missing validation.
+description: Performs high-signal UniCart diff review. Use for pre-merge checks focused on bugs, broken invariants, security issues, and missing validation.
 tools: ["read", "search"]
 ---
 # Code Reviewer
 
 ## Purpose
-- Review CampusCart changes for correctness, security, and maintainability with emphasis on real defects over stylistic noise.
+- Review UniCart changes for correctness, security, and maintainability with emphasis on real defects over stylistic noise.
 - Keep attention on architectural invariants unique to this repository.
 
 ## Scope

@@ -1,11 +1,11 @@
 ---
 name: campuscart-feature-planning
-description: Plans cross-surface CampusCart features and delivery slices. Use when a request needs scoping, acceptance criteria, or implementation sequencing.
+description: Plans cross-surface UniCart features and delivery slices. Use when a request needs scoping, acceptance criteria, or implementation sequencing.
 ---
 # campuscart-feature-planning
 
 Purpose
-- Break a CampusCart feature request into implementation slices across `backend/`, `frontend/`, `edge/uno_q/`, `docs/`, and deployment files when needed.
+- Break a UniCart feature request into implementation slices across `backend/`, `frontend/`, `edge/uno_q/`, `docs/`, and deployment files when needed.
 - Keep the plan anchored to real repo paths and core product rules.
 
 When to use
@@ -17,7 +17,7 @@ Procedure
 2. Map the change to concrete files such as `backend/app/routers/*.py`, `backend/app/services/*.py`, `frontend/src/`, `edge/uno_q/`, `render.yaml`, or `docs/`.
 3. List domain invariants that must hold: money in minor units, explicit order statuses, seller-scoped edge access, AI draft-only behavior, manual payment confirmation.
 4. Split work into backend, frontend, database, edge, QA, security, and docs slices only when necessary.
-5. Assign the smallest reasonable set of CampusCart agents and skills for execution.
+5. Assign the smallest reasonable set of UniCart agents and skills for execution.
 
 Expected outputs
 - Scope summary, non-goals, touched paths, risks, and verification plan.

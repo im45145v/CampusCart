@@ -1,11 +1,11 @@
 ---
 name: campuscart-deployment-release
-description: Guides CampusCart release and deployment coordination. Use when changing CI, Render, Atlas, secrets, or rollout sequencing.
+description: Guides UniCart release and deployment coordination. Use when changing CI, Render, Atlas, secrets, or rollout sequencing.
 ---
 # campuscart-deployment-release
 
 Purpose
-- Coordinate CampusCart deployment, CI, and release readiness across backend, frontend, and edge surfaces.
+- Coordinate UniCart deployment, CI, and release readiness across backend, frontend, and edge surfaces.
 - Keep operator guidance aligned with the actual stack.
 
 When to use

@@ -41,7 +41,7 @@ async def my_orders(
 async def seller_orders(
     user: SellerUser, db: DbDep, status: str | None = None, limit: int = Query(50, ge=1, le=100)
 ) -> list[dict[str, Any]]:
-    flt: dict[str, Any] = {"seller_id": user["_id"]}
+    flt: dict[str, Any] = {"seller_id": user["_id"], "payment_status": {"$ne": "awaiting_upi"}}
     if status:
         flt["status"] = status
     cur = db.orders.find(flt).sort("created_at", -1).limit(limit)
@@ -93,12 +93,14 @@ async def quote(order_id: str, body: QuoteIn, user: SellerUser, db: DbDep) -> di
 
 @router.post("/orders/{order_id}/confirm-payment")
 async def confirm_payment(order_id: str, user: SellerUser, db: DbDep) -> dict[str, Any]:
-    """Seller manually confirms they received payment. CampusCart does not verify payments."""
+    """Seller manually confirms they received payment. UniCart does not verify payments."""
     o, role = await _load(db, order_id, user)
     if role != "seller":
         raise HTTPException(403, "Only the seller can confirm payment")
     if o["status"] in ("rejected", "cancelled"):
         raise HTTPException(409, "Order is closed")
+    if o.get("payment_status") == "awaiting_upi":
+        raise HTTPException(409, "This order is waiting for the UPI payment")
     if o.get("payment_status") == "wallet_paid":
         raise HTTPException(409, "This order was already paid from the campus wallet")
     await db.orders.update_one(

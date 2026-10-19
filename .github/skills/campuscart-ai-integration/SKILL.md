@@ -1,11 +1,11 @@
 ---
 name: campuscart-ai-integration
-description: Guides CampusCart AI draft and transcription work. Use when changing listing-draft, speech-to-text, or model validation behavior.
+description: Guides UniCart AI draft and transcription work. Use when changing listing-draft, speech-to-text, or model validation behavior.
 ---
 # campuscart-ai-integration
 
 Purpose
-- Build or review CampusCart AI-assisted listing draft and transcription features with strict grounding rules.
+- Build or review UniCart AI-assisted listing draft and transcription features with strict grounding rules.
 - Keep LLM and speech integrations safe, optional, and truthful.
 
 When to use

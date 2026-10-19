@@ -1,11 +1,11 @@
 ---
 name: campuscart-api-development
-description: Guides CampusCart FastAPI endpoint and service work. Use when adding or modifying backend routes, models, or business logic.
+description: Guides UniCart FastAPI endpoint and service work. Use when adding or modifying backend routes, models, or business logic.
 ---
 # campuscart-api-development
 
 Purpose
-- Add or modify CampusCart FastAPI endpoints and backend behavior in `backend/app/`.
+- Add or modify UniCart FastAPI endpoints and backend behavior in `backend/app/`.
 - Keep request validation, RBAC, service logic, and tests in sync.
 
 When to use

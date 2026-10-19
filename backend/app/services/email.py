@@ -12,16 +12,16 @@ async def send_login_email(*, api_key: str, sender: str, to: str, code: str, lin
     safe_code = escape(code)
     safe_link = escape(link, quote=True)
     text = (
-        f"Your CampusCart sign-in code is {code}.\n\n"
+        f"Your UniCart sign-in code is {code}.\n\n"
         "It expires in 10 minutes. You can also open this link:\n"
         f"{link}\n\n"
         "If you did not try to sign in, you can ignore this email."
     )
     html = (
-        "<p>Your CampusCart sign-in code is "
+        "<p>Your UniCart sign-in code is "
         f"<strong style=\"letter-spacing:0.2em\">{safe_code}</strong>.</p>"
         "<p>It expires in 10 minutes. Or use this link:</p>"
-        f"<p><a href=\"{safe_link}\">Sign in to CampusCart</a></p>"
+        f"<p><a href=\"{safe_link}\">Sign in to UniCart</a></p>"
         "<p>If you did not try to sign in, you can ignore this email.</p>"
     )
     try:
@@ -32,7 +32,7 @@ async def send_login_email(*, api_key: str, sender: str, to: str, code: str, lin
                 json={
                     "from": sender,
                     "to": [to],
-                    "subject": "Your CampusCart sign-in code",
+                    "subject": "Your UniCart sign-in code",
                     "text": text,
                     "html": html,
                 },

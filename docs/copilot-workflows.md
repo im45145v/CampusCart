@@ -1,4 +1,4 @@
-# CampusCart Copilot workflows
+# UniCart Copilot workflows
 
 Use `.github/copilot-instructions.md` as the baseline context, then select the narrowest agent and skill pair that matches the task.
 

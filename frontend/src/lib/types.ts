@@ -75,6 +75,7 @@ export interface Order {
   discount_minor?: number; subscription_id?: string | null
   voucher_code?: string | null; voucher_title?: string | null; voucher_discount_minor?: number
   fulfillment: string; payment_method: string; payment_status: string; note: string
+  checkout_url?: string | null
   request_details: string; status: OrderStatus; created_at: string
   pickup_slot?: { date: string; label: string } | null
   answers?: { id: string; label: string; value: string }[]
@@ -102,7 +103,15 @@ export interface WalletEntry {
   note: string; method: string | null; status: string; balance_after_minor: number
   related_id: string | null; created_at: string; transaction_id?: string | null
 }
-export interface Wallet { balance_minor: number; upi_id: string; entries: WalletEntry[] }
+export interface Wallet {
+  balance_minor: number
+  checkout: 'ready' | 'unavailable'
+  entries: WalletEntry[]
+}
+export interface WalletCheckout extends WalletEntry {
+  checkout_url?: string | null
+  youpi_payment_id?: string | null
+}
 export interface Plan {
   id: string; store_id: string; title: string; description: string; price_minor: number
   period: 'week' | 'month'; discount_percent: number; active: boolean; store_name?: string

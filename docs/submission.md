@@ -8,7 +8,7 @@ Replace the bracketed URLs after [deploy.md](deploy.md). Before you publish, del
 
 ## Side hustle, with the price left blank on purpose
 
-CampusCart is the till for a student stall: a wok counter, a print desk, or a coffee cart on one campus. The person who would pay is the student running the stall, because orders stop living in a group chat. Buyers pay with campus-wallet credits they loaded themselves, or when they pick up. Nothing in the app verifies a bank or UPI payment.
+UniCart is the till for a student stall: a wok counter, a print desk, or a coffee cart on one campus. The person who would pay is the student running the stall, because orders stop living in a group chat. Buyers pay with campus-wallet credits they loaded themselves, or when they pick up. Nothing in the app verifies a bank or UPI payment.
 
 The open-weight piece is the listing writer. In Seller Studio, Gemma 4 turns a sentence the seller actually said into a draft. The sample note is "Garlic fried rice, 90 rupees, 12 portions, ready in 15 minutes, hostel pickup." The model may fill only numbers that appear in that sentence. It does not invent a price or a stock count, and it does not publish. The seller reviews the form and saves a draft. A closed "fill this form for me" API that guesses ₹90 when the seller never said it would be worse for this business: the wrong price is a real order.
 
@@ -52,4 +52,4 @@ flowchart LR
 
 Chat and live order updates share one socket. The socket accepts the page only when its origin is listed in `CORS_ORIGINS`. Uploaded print files sit on the API disk, which does not survive a Render restart. The seeded stalls do not depend on those files.
 
-Wallet credits are an on-campus ledger: a student submits a UPI transaction ID, and staff approve it before the credits can be spent. Staff can still reverse a posted top-up. Tanuj Prints and Potato's Makerspace take those credits when the price is known and do not offer cash at collection. Kaaram & Ko and Campus Brewers still take cash at pickup. A cancel or rejection returns the credits once. Karma, if a listing has it, is not money.
+Wallet credits are an on-campus ledger: a student pays in a YouPI checkout, and the credits become spendable only after the server verifies YouPI’s signed UPI confirmation. Staff can still reverse a posted top-up. Tanuj Prints and Potato's Makerspace take those credits when the price is known and do not offer cash at collection. Kaaram & Ko and Campus Brewers still take cash at pickup. A cancel or rejection returns the credits once. Karma, if a listing has it, is not money.

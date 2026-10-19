@@ -144,7 +144,7 @@ async def test_configured_resend_sends_mail_and_hides_the_code(
     monkeypatch.setattr("app.routers.auth.send_login_email", fake_send)
     settings = get_settings()
     monkeypatch.setattr(settings, "resend_api_key", "re_test")
-    monkeypatch.setattr(settings, "email_from", "CampusCart <login@example.com>")
+    monkeypatch.setattr(settings, "email_from", "UniCart <login@example.com>")
     monkeypatch.setattr(settings, "public_web_url", "https://campuscart.example")
     r = await client.post(
         "/api/auth/email/start", json={"email": "live@example.com", "name": "Liv"},
@@ -152,6 +152,6 @@ async def test_configured_resend_sends_mail_and_hides_the_code(
     assert r.status_code == 200
     assert r.json() == {"sent": True}
     assert sent["to"] == "live@example.com"
-    assert sent["sender"] == "CampusCart <login@example.com>"
+    assert sent["sender"] == "UniCart <login@example.com>"
     assert "https://campuscart.example/login/verify?token=" in sent["link"]
     assert len(sent["code"]) == 6
