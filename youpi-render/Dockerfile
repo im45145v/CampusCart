@@ -9,7 +9,7 @@ RUN git clone --depth 1 https://github.com/youpi-pg/YouPI-PG.git .
 
 RUN npm install
 
-COPY start.sh patch-upi.mjs patch-health.mjs patch-guest.mjs proxy.mjs /opt/render/
+COPY start.sh patch-upi.mjs patch-health.mjs patch-guest.mjs patch-observe.mjs proxy.mjs /opt/render/
 RUN chmod +x /opt/render/start.sh
 
 ENV NODE_ENV=production
