@@ -162,6 +162,33 @@ async def test_youpi_callback_credits_once(
     assert (await client.get("/api/me/wallet", headers=buyer.headers)).json()["balance_minor"] == 20_00
 
 
+async def test_gmail_connection_is_kept_for_the_next_boot(
+    client: httpx.AsyncClient, buyer: Actor, monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    _enable_youpi(monkeypatch)
+    token = "1//test-refresh-token-value"
+    missing = await client.get("/api/payments/youpi/gmail", headers=buyer.headers)
+    assert missing.status_code == 401
+    rejected = await client.put(
+        "/api/payments/youpi/gmail",
+        headers={"X-Merchant-Key": "not-the-secret"},
+        json={"refresh_token": token, "connected_email": "payer@gmail.com"},
+    )
+    assert rejected.status_code == 401
+    empty = await client.get("/api/payments/youpi/gmail", headers={"X-Merchant-Key": SECRET})
+    assert empty.status_code == 404
+    saved = await client.put(
+        "/api/payments/youpi/gmail",
+        headers={"X-Merchant-Key": SECRET},
+        json={"refresh_token": token, "connected_email": "payer@gmail.com"},
+    )
+    assert saved.status_code == 200, saved.text
+    assert saved.json() == {"saved": True}
+    restored = await client.get("/api/payments/youpi/gmail", headers={"X-Merchant-Key": SECRET})
+    assert restored.status_code == 200
+    assert restored.json() == {"refresh_token": token, "connected_email": "payer@gmail.com"}
+
+
 async def test_youpi_checkout_replaces_a_session_youpi_no_longer_has(
     client: httpx.AsyncClient, buyer: Actor, monkeypatch: pytest.MonkeyPatch,
 ) -> None:

@@ -31,6 +31,35 @@ def configured() -> bool:
     return bool(settings.youpi_api_url and settings.youpi_merchant_id and settings.youpi_webhook_secret)
 
 
+def merchant_key_matches(presented: str) -> bool:
+    secret = get_settings().youpi_webhook_secret
+    if not secret or not presented or len(presented) != len(secret):
+        return False
+    return hmac.compare_digest(presented, secret)
+
+
+async def save_gmail_connection(db: Any, refresh_token: str, connected_email: str) -> None:
+    """Remember the Gmail refresh token somewhere a YouPI restart cannot wipe."""
+    from ..util import now
+    await db.youpi_gmail.update_one(
+        {"_id": "gmail"},
+        {"$set": {
+            "refresh_token": refresh_token,
+            "connected_email": connected_email,
+            "updated_at": now(),
+        }},
+        upsert=True,
+    )
+
+
+async def read_gmail_connection(db: Any) -> dict[str, str] | None:
+    row = await db.youpi_gmail.find_one({"_id": "gmail"})
+    token = str((row or {}).get("refresh_token") or "").strip()
+    if not token:
+        return None
+    return {"refresh_token": token, "connected_email": str(row.get("connected_email") or "")}
+
+
 def minor_to_rupees(amount_minor: int) -> str:
     return f"{amount_minor // 100}.{amount_minor % 100:02d}"
 

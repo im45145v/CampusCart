@@ -33,6 +33,7 @@ export OBSERVER_API_TOKEN
 node /opt/render/patch-health.mjs
 node /opt/render/patch-guest.mjs
 node /opt/render/patch-observe.mjs
+node /opt/render/patch-gmail.mjs
 
 node apps/payment-api/src/index.js &
 ready=0
@@ -47,6 +48,8 @@ if [ "$ready" != 1 ]; then
   echo "YouPI database did not accept the receiving UPI"
   exit 1
 fi
+
+node /opt/render/patch-gmail.mjs restore
 
 node apps/gmail-observer/src/index.js &
 node apps/sms-observer/src/index.js &
