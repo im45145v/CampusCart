@@ -14,6 +14,7 @@ interface AuthState {
   requestEmailCode: (email: string, name?: string) => Promise<EmailStartResult>
   verifyEmailCode: (email: string, code: string) => Promise<void>
   verifyMagicLink: (token: string) => Promise<void>
+  register: (name: string, email: string, password: string) => Promise<void>
   login: (email: string, password: string) => Promise<void>
   logout: () => void
   refresh: () => Promise<void>
@@ -81,6 +82,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       },
       verifyMagicLink: async (token) => {
         adopt(setUser, await api('/api/auth/email/verify-link', { method: 'POST', body: { token } }))
+      },
+      register: async (name, email, password) => {
+        adopt(setUser, await api('/api/auth/register', { method: 'POST', body: { name, email, password } }))
       },
       login: async (email, password) => {
         adopt(setUser, await api('/api/auth/login', { method: 'POST', body: { email, password } }))

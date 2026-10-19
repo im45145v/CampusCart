@@ -42,7 +42,7 @@ export function PrivacyPage() {
       <p>UniCart stores what the stalls and orders need. It is not sold, and it is not used for ads.</p>
       <h2 className="text-base font-bold">What is stored</h2>
       <ul className="list-disc space-y-1 pl-5">
-        <li>Your name and email. A sign-in code is kept only as a hash until it expires. Password accounts also store a bcrypt hash.</li>
+        <li>Your name, email, and a bcrypt hash of your password.</li>
         <li>Orders, pickup slots, checkout answers, reviews, and messages.</li>
         <li>Stall details, listings, photos, and print files you upload.</li>
         <li>The campus wallet ledger: top-up checkouts, the YouPI payment id, payouts, refunds, and the note you wrote.</li>
@@ -77,7 +77,7 @@ export function HelpPage() {
   return (
     <Page title="Help">
       <h2 className="text-base font-bold">Sign in</h2>
-      <p>Enter your email and we send a 6-digit code plus a one-time link. The code lasts 10 minutes. The first time that email is used, add your name so we can open the account. Seeded demo stalls still accept the password on the sign-in page.</p>
+      <p>Create an account with your name, email, and a password of at least 8 characters, or sign in with that email and password. Demo stalls use the seeded email and password on the sign-in page.</p>
       <h2 className="text-base font-bold">Order</h2>
       <p>Search or browse, open a stall, and add what you want. A stall marked Pay upfront takes campus credits when you order and does not take cash at the counter. Other stalls let you choose. Each stall gets its own order. Track it from your account.</p>
       <h2 className="text-base font-bold">Print</h2>

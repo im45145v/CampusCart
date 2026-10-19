@@ -106,7 +106,12 @@ export function Layout() {
                 <Button variant="ghost" size="sm" className="hidden text-white hover:bg-white/10 hover:text-white md:inline-flex" onClick={logout}>Log out</Button>
               </>
             ) : (
-              <Button asChild size="sm"><Link to="/login">Log in</Link></Button>
+              <>
+                <Button asChild variant="ghost" size="sm" className="hidden text-white hover:bg-white/10 hover:text-white sm:inline-flex">
+                  <Link to="/register">Sign up</Link>
+                </Button>
+                <Button asChild size="sm"><Link to="/login">Log in</Link></Button>
+              </>
             )}
             <button type="button" className={`${iconBtn} md:hidden`} aria-expanded={menu} aria-controls="mobile-nav" aria-label={menu ? 'Close menu' : 'Open menu'} onClick={() => setMenu((v) => !v)}>
               {menu ? <X className="h-5 w-5" aria-hidden /> : <Menu className="h-5 w-5" aria-hidden />}
@@ -123,7 +128,12 @@ export function Layout() {
               {user?.roles.includes('seller') && <NavLink to="/seller" className={link}>Seller studio</NavLink>}
               {user?.roles.includes('admin') && <NavLink to="/admin" className={link}>Admin</NavLink>}
               {user && <NavLink to="/account" className={link}><UserRound className="h-4 w-4" aria-hidden /> {user.name}</NavLink>}
-              {user ? <button type="button" className={cn(link, 'text-left')} onClick={logout}>Log out</button> : <NavLink to="/login" className={link}>Log in</NavLink>}
+              {user ? <button type="button" className={cn(link, 'text-left')} onClick={logout}>Log out</button> : (
+                <>
+                  <NavLink to="/register" className={link}>Sign up</NavLink>
+                  <NavLink to="/login" className={link}>Log in</NavLink>
+                </>
+              )}
             </div>
           </nav>
         )}
