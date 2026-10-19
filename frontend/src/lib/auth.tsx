@@ -1,5 +1,5 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from 'react'
-import { api, tokenStore } from './api'
+import { ApiError, api, tokenStore } from './api'
 import type { User } from './types'
 
 export interface EmailStartResult {
@@ -21,6 +21,20 @@ interface AuthState {
 
 const AuthContext = createContext<AuthState | null>(null)
 
+async function loadMe(): Promise<User> {
+  let last: unknown
+  for (let attempt = 0; attempt < 3; attempt += 1) {
+    try {
+      return await api<User>('/api/auth/me')
+    } catch (e) {
+      last = e
+      if (e instanceof ApiError && e.status === 401) throw e
+      if (attempt < 2) await new Promise((resolve) => setTimeout(resolve, 2000))
+    }
+  }
+  throw last
+}
+
 function adopt(setUser: (user: User) => void, result: { token: string; user: User }) {
   tokenStore.set(result.token)
   setUser(result.user)
@@ -37,10 +51,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       return
     }
     try {
-      setUser(await api<User>('/api/auth/me'))
-    } catch {
-      tokenStore.clear()
-      setUser(null)
+      setUser(await loadMe())
+    } catch (e) {
+      if (e instanceof ApiError && e.status === 401) {
+        tokenStore.clear()
+        setUser(null)
+      }
     } finally {
       setLoading(false)
     }
